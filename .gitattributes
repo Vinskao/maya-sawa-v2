@@ -1,1 +1,11 @@
 * text=auto
+/bin/* binary
+/envs/* binary
+/envs/.local/* binary
+/envs/.production/* binary
+/envs/.production/.postgres binary
+/envs/.production/.django binary
+/envs/.production/.redis binary
+/envs/.production/.celery binary
+/envs/.production/.openai binary
+/envs/.production/.anthropic binary

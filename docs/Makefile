@@ -1,33 +1,30 @@
-# Makefile for Sphinx documentation
+# Minimal makefile for Sphinx documentation
 #
 
-# You can set these variables from the command line.
-SPHINXOPTS    =
-SPHINXBUILD   = sphinx-build
+# You can set these variables from the command line, and also
+# from the environment for the first two.
+SPHINXOPTS    ?=
+SPHINXBUILD   ?= sphinx-build
 SOURCEDIR     = .
-BUILDDIR      = _build
+BUILDDIR      = ./_build
+APP = ../maya_sawa_v2
 
-.PHONY: help clean html livehtml linkcheck
 
-help:
-	@echo "Please use \`make <target>' where <target> is one of"
-	@awk '/^#/{c=substr($$0,3);next}c&&/^[[:alpha:]][[:alnum:]_-]+:/{print substr($$1,1,index($$1,":")),c}1{c=0}' $(MAKEFILE_LIST) | column -s: -t
+.PHONY: html livehtml apidocs Makefile
 
-# Clean the build output
-clean:
-	-rm -rf $(BUILDDIR)/*
-
-# Build the HTML docs
+# Put it first so that "make" without argument is like "make html".
 html:
-	$(SPHINXBUILD) -b html $(SPHINXOPTS) $(SOURCEDIR) $(BUILDDIR)/html
+	@$(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) -c .
 
-# Build and serve docs with live reload
+# Build, watch and serve docs with live reload
 livehtml:
-	sphinx-autobuild -b html --port 9000 --watch . -c . $(SOURCEDIR) $(BUILDDIR)/html
+	sphinx-autobuild -b html --open-browser --port 9000 --watch $(APP) -c . $(SOURCEDIR) $(BUILDDIR)/html
 
-# Check all external links for integrity
-linkcheck:
-	$(SPHINXBUILD) -b linkcheck $(SPHINXOPTS) $(SOURCEDIR) $(BUILDDIR)/linkcheck
-	@echo
-	@echo "Link check complete; look for any errors in the above output " \
-	      "or in $(BUILDDIR)/linkcheck/output.txt."
+# Outputs rst files from django application code
+apidocs:
+	sphinx-apidoc -o $(SOURCEDIR)/api $(APP)
+
+# Catch-all target: route all unknown targets to Sphinx using the new
+# "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
+%: Makefile
+	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) -c .

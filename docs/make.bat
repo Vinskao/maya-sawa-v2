@@ -1,55 +1,46 @@
 @ECHO OFF
 
+pushd %~dp0
+
 REM Command file for Sphinx documentation
 
+
 if "%SPHINXBUILD%" == "" (
-	set SPHINXBUILD=sphinx-build
+	set SPHINXBUILD=sphinx-build -c .
 )
-set SOURCEDIR=.
+set SOURCEDIR=_source
 set BUILDDIR=_build
-set ALLSPHINXOPTS=-d %BUILDDIR%/doctrees %SPHINXOPTS%
-set I18NSPHINXOPTS=%SPHINXOPTS% .
+set APP=..\maya_sawa_v2
 
-if "%1" == "" goto help
+if "%1" == "" goto html
 
-if "%1" == "help" (
-	:help
-	echo.Please use `make ^<target^>` where ^<target^> is one of
-	echo.  clean      to clean the build directory
-	echo.  html       to make standalone HTML files
-	echo.  livehtml   to build and serve docs with live reload
-	echo.  linkcheck  to check all external links for integrity
-	goto end
-)
-
-if "%1" == "clean" (
-	for /d %%i in (%BUILDDIR%\*) do rmdir /q /s %%i
-	del /q /s %BUILDDIR%\*
-	goto end
-)
-
-if "%1" == "html" (
-	%SPHINXBUILD% -b html %ALLSPHINXOPTS% %SOURCEDIR% %BUILDDIR%/html
-	if errorlevel 1 exit /b 1
+%SPHINXBUILD% >NUL 2>NUL
+if errorlevel 9009 (
 	echo.
-	echo.Build finished. The HTML pages are in %BUILDDIR%/html.
-	goto end
-)
-
-if "%1" == "livehtml" (
-    sphinx-autobuild -b html --port 9000 --watch . -c . %SOURCEDIR% %BUILDDIR%/html
-	%SPHINXBUILD% -b html %ALLSPHINXOPTS% %BUILDDIR%/html
-	if errorlevel 1 exit /b 1
-	goto end
-)
-
-if "%1" == "linkcheck" (
-	%SPHINXBUILD% -b linkcheck %ALLSPHINXOPTS% %SOURCEDIR% %BUILDDIR%/linkcheck
-	if errorlevel 1 exit /b 1
+	echo.The 'sphinx-build' command was not found. Make sure you have Sphinx
+	echo.installed, then set the SPHINXBUILD environment variable to point
+	echo.to the full path of the 'sphinx-build' executable. Alternatively you
+	echo.may add the Sphinx directory to PATH.
 	echo.
-	echo.Link check complete; look for any errors in the above output ^
-or in %BUILDDIR%/linkcheck/output.txt.
-	goto end
+	echo.Install sphinx-autobuild for live serving.
+	echo.If you don't have Sphinx installed, grab it from
+	echo.http://sphinx-doc.org/
+	exit /b 1
 )
+
+%SPHINXBUILD% -b %1 %SOURCEDIR% %BUILDDIR% %SPHINXOPTS% %O%
+goto end
+
+:livehtml
+sphinx-autobuild -b html --open-browser -p 9000 --watch %APP% -c . %SOURCEDIR% %BUILDDIR%/html
+GOTO :EOF
+
+:apidocs
+sphinx-apidoc -o %SOURCEDIR%/api %APP%
+GOTO :EOF
+
+:html
+%SPHINXBUILD% -b html %SOURCEDIR% %BUILDDIR% %SPHINXOPTS% %O%
 
 :end
+popd
