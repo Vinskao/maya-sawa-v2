@@ -27,17 +27,16 @@ class OpenAIProvider(AIProvider):
     def generate_response(self, message: str, context: Optional[Dict[str, Any]] = None) -> str:
         """使用 OpenAI API 生成回應"""
         try:
-            import openai
+            from openai import OpenAI
 
             if not self.api_key:
                 raise ValueError("OpenAI API key not found")
 
             # 配置 OpenAI 客戶端
-            openai.api_key = self.api_key
-            if self.organization:
-                openai.organization = self.organization
-            if self.api_base:
-                openai.api_base = self.api_base
+            client = OpenAI(
+                api_key=self.api_key,
+                base_url=self.api_base if self.api_base != 'https://api.openai.com/v1' else None
+            )
 
             # 構建對話歷史
             messages = []
@@ -46,7 +45,7 @@ class OpenAIProvider(AIProvider):
 
             messages.append({"role": "user", "content": message})
 
-            response = openai.ChatCompletion.create(
+            response = client.chat.completions.create(
                 model=self.model,
                 messages=messages,
                 max_tokens=1000,
@@ -55,44 +54,94 @@ class OpenAIProvider(AIProvider):
 
             return response.choices[0].message.content
 
+        except ImportError:
+            logger.error("OpenAI library not installed")
+            return "抱歉，OpenAI 函式庫未安裝，請先安裝 openai 套件。"
         except Exception as e:
             logger.error(f"OpenAI API error: {str(e)}")
             return f"抱歉，AI 服務暫時無法使用。錯誤：{str(e)}"
 
 
-class AnthropicProvider(AIProvider):
-    """Anthropic Claude API 提供者"""
+class GeminiProvider(AIProvider):
+    """Google Gemini API 提供者"""
 
-    def __init__(self, api_key: str = None, model: str = "claude-3-sonnet-20240229"):
-        self.api_key = api_key or os.getenv('ANTHROPIC_API_KEY')
+    def __init__(self, api_key: str = None, model: str = "gemini-1.5-flash"):
+        self.api_key = api_key or os.getenv('GOOGLE_API_KEY')
         self.model = model
 
     def generate_response(self, message: str, context: Optional[Dict[str, Any]] = None) -> str:
-        """使用 Anthropic API 生成回應"""
+        """使用 Gemini API 生成回應"""
         try:
-            import anthropic
+            import google.generativeai as genai
 
             if not self.api_key:
-                raise ValueError("Anthropic API key not found")
+                raise ValueError("Google API key not found")
 
-            client = anthropic.Anthropic(api_key=self.api_key)
+            genai.configure(api_key=self.api_key)
+            model = genai.GenerativeModel(self.model)
 
-            # 構建系統提示
-            system_prompt = "你是一個有用的 AI 助手，請用中文回答用戶的問題。"
-            if context and 'system_prompt' in context:
-                system_prompt = context['system_prompt']
+            # 構建對話歷史
+            chat = model.start_chat(history=[])
+            if context and 'conversation_history' in context:
+                for msg in context['conversation_history']:
+                    if msg['role'] == 'user':
+                        chat.send_message(msg['content'])
+                    elif msg['role'] == 'assistant':
+                        # Gemini 會自動處理助手回應
+                        pass
 
-            response = client.messages.create(
+            response = chat.send_message(message)
+            return response.text
+
+        except ImportError:
+            logger.error("Google Generative AI library not installed")
+            return "抱歉，Google Generative AI 函式庫未安裝，請先安裝 google-generativeai 套件。"
+        except Exception as e:
+            logger.error(f"Gemini API error: {str(e)}")
+            return f"抱歉，AI 服務暫時無法使用。錯誤：{str(e)}"
+
+
+class QwenProvider(AIProvider):
+    """Qwen API 提供者"""
+
+    def __init__(self, api_key: str = None, model: str = "qwen-turbo"):
+        self.api_key = api_key or os.getenv('QWEN_API_KEY')
+        self.model = model
+
+    def generate_response(self, message: str, context: Optional[Dict[str, Any]] = None) -> str:
+        """使用 Qwen API 生成回應"""
+        try:
+            import dashscope
+
+            if not self.api_key:
+                raise ValueError("Qwen API key not found")
+
+            dashscope.api_key = self.api_key
+
+            # 構建對話歷史
+            messages = []
+            if context and 'conversation_history' in context:
+                messages.extend(context['conversation_history'])
+
+            messages.append({"role": "user", "content": message})
+
+            response = dashscope.MultiModalConversation.call(
                 model=self.model,
+                messages=messages,
                 max_tokens=1000,
-                system=system_prompt,
-                messages=[{"role": "user", "content": message}]
+                temperature=0.7
             )
 
-            return response.content[0].text
+            if response.status_code == 200:
+                return response.output.choices[0].message.content
+            else:
+                raise Exception(f"Qwen API error: {response.message}")
 
+        except ImportError:
+            logger.error("DashScope library not installed")
+            return "抱歉，DashScope 函式庫未安裝，請先安裝 dashscope 套件。"
         except Exception as e:
-            logger.error(f"Anthropic API error: {str(e)}")
+            logger.error(f"Qwen API error: {str(e)}")
             return f"抱歉，AI 服務暫時無法使用。錯誤：{str(e)}"
 
 
@@ -129,10 +178,15 @@ def get_ai_provider(provider_name: str, config: Dict[str, Any] = None) -> AIProv
             organization=config.get('organization'),
             api_base=config.get('api_base')
         )
-    elif provider_name.lower() == 'anthropic':
-        return AnthropicProvider(
+    elif provider_name.lower() == 'gemini':
+        return GeminiProvider(
             api_key=config.get('api_key'),
-            model=config.get('model', 'claude-3-sonnet-20240229')
+            model=config.get('model', 'gemini-1.5-flash')
+        )
+    elif provider_name.lower() == 'qwen':
+        return QwenProvider(
+            api_key=config.get('api_key'),
+            model=config.get('model', 'qwen-turbo')
         )
     elif provider_name.lower() == 'mock':
         return MockProvider()

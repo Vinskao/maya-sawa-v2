@@ -18,6 +18,11 @@ if READ_DOT_ENV_FILE:
 
 # GENERAL
 # ------------------------------------------------------------------------------
+# https://docs.djangoproject.com/en/dev/ref/settings/#secret-key
+SECRET_KEY = env(
+    "DJANGO_SECRET_KEY",
+    default="10QUxyiQ3CHSlZpgtj5Y9pbBLLl7fcDTXtmrOKvsPp4KmJL6hVP68NZyhaadsNUN",
+)
 # https://docs.djangoproject.com/en/dev/ref/settings/#debug
 DEBUG = env.bool("DJANGO_DEBUG", True)
 # Local time zone. Choices are
@@ -82,6 +87,7 @@ THIRD_PARTY_APPS = [
     "allauth.mfa",
     "allauth.socialaccount",
     "rest_framework",
+    "drf_spectacular",
 ]
 
 LOCAL_APPS = [
@@ -304,6 +310,7 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 # Celery Configuration
@@ -318,3 +325,29 @@ CELERY_TASK_DEFAULT_QUEUE = 'maya_v2'
 CELERY_TASK_ROUTES = {
     'maya_sawa_v2.ai_processing.tasks.*': {'queue': 'maya_v2'},
 }
+
+# drf-spectacular Configuration
+# ------------------------------------------------------------------------------
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Maya Sawa V2 API',
+    'DESCRIPTION': 'AI对话系统API文档',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': '/maya-v2/',
+}
+
+# API Security Configuration
+# ------------------------------------------------------------------------------
+# 控制API是否需要认证
+API_REQUIRE_AUTHENTICATION = env.bool('API_REQUIRE_AUTHENTICATION', default=False)
+
+# 控制API是否需要CSRF保护
+API_REQUIRE_CSRF = env.bool('API_REQUIRE_CSRF', default=False)
+
+# 允许的API来源（CORS设置）
+API_ALLOWED_ORIGINS = env.list('API_ALLOWED_ORIGINS', default=['http://localhost:3000', 'http://127.0.0.1:3000'])
+
+# API速率限制设置
+API_RATE_LIMIT_ENABLED = env.bool('API_RATE_LIMIT_ENABLED', default=False)
+API_RATE_LIMIT_PER_MINUTE = env.int('API_RATE_LIMIT_PER_MINUTE', default=60)
