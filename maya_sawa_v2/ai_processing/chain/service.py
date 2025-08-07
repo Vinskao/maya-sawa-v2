@@ -51,12 +51,16 @@ class ConversationTypeService:
         result = self.chain_manager.process(context)
 
         # 返回分類結果
+        # 如果 filter chain 返回了明確的類型，使用它
+        # 否則保持當前類型
+        final_type = result.conversation_type if result.conversation_type else current_type
+        
         return {
-            'conversation_type': result.conversation_type or current_type,
+            'conversation_type': final_type,
             'confidence': result.confidence,
             'reason': result.reason,
             'metadata': result.metadata or {},
-            'should_update': result.conversation_type != current_type
+            'should_update': result.conversation_type and result.conversation_type != current_type
         }
 
     def get_filter_chain_info(self) -> Dict[str, Any]:

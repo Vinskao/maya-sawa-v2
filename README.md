@@ -149,7 +149,10 @@ graph LR
     subgraph "API 模組"
         A1[ConversationViewSet]
         A2[AIModelViewSet]
-        A3[Serializers]
+        A3[ask_with_model API]
+        A4[available_models API]
+        A5[add_model API]
+        A6[Serializers]
     end
     
     subgraph "Users 模組"
@@ -177,8 +180,14 @@ graph LR
     A1 --> C2
     A1 --> AI1
     A2 --> AI2
+    A3 --> C1
     A3 --> C2
     A3 --> AI1
+    A3 --> AI2
+    A4 --> AI2
+    A5 --> AI2
+    A6 --> C2
+    A6 --> AI1
     
     %% Users 模組的協作關係
     U1 --> C1
@@ -215,25 +224,38 @@ sequenceDiagram
     participant F as 前端
     participant A as API
     participant DB as 資料庫
-    participant C as Celery
+    participant KM as 知識庫
     participant AI as AI Provider
     
+    Note over U,AI: 新的 ask-with-model API 流程
+    
+    U->>F: 發送問題
+    F->>A: POST /maya-v2/ask-with-model/
+    A->>DB: 創建 Conversation 和 Message
+    A->>KM: 搜索知識庫
+    KM->>A: 返回相關知識
+    A->>AI: 調用指定 AI 模型
+    AI->>A: 返回 AI 回應
+    A->>DB: 創建 AI Message
+    A->>F: 返回完整回應
+    F->>U: 顯示 AI 回應和知識庫內容
+    
+    Note over U,AI: 傳統對話 API 流程（已棄用）
+    
     U->>F: 發送訊息
-    F->>A: POST /api/v1/conversations/{id}/send_message/
+    F->>A: POST /maya-v2/conversations/{id}/send_message/
     A->>DB: 創建 Message 記錄
     A->>DB: 創建 ProcessingTask 記錄
-    A->>C: 觸發 process_ai_response.delay()
     A->>F: 回傳成功回應
     F->>U: 顯示訊息已發送
     
-    C->>DB: 獲取對話歷史
-    C->>AI: 調用 AI Provider
-    AI->>C: 回傳 AI 回應
-    C->>DB: 創建 AI Message 記錄
-    C->>DB: 更新 ProcessingTask 狀態
+    A->>AI: 調用 AI Provider
+    AI->>A: 回傳 AI 回應
+    A->>DB: 創建 AI Message 記錄
+    A->>DB: 更新 ProcessingTask 狀態
     
     U->>F: 查詢回應狀態
-    F->>A: GET /api/v1/conversations/{id}/messages/
+    F->>A: GET /maya-v2/conversations/{id}/messages/
     A->>DB: 獲取最新訊息
     A->>F: 回傳對話記錄
     F->>U: 顯示 AI 回應
@@ -297,9 +319,9 @@ erDiagram
 
 
 
-## 開始
 
-### 1. 環境設置
+
+## 開始
 
 ```bash
 # 複製環境變量模板
@@ -341,6 +363,36 @@ poetry run uvicorn config.asgi:application --host 0.0.0.0 --port 8000
 poetry run celery -A config worker -l info -Q maya_v2
 ```
 
+## 快速測試
+
+```bash
+# 1. 啟動伺服器
+poetry run python manage.py runserver
+
+# 2. 獲取可用模型
+curl -X GET "http://127.0.0.1:8000/maya-v2/available-models/"
+
+# 3. 測試編程問題
+curl -X POST "http://127.0.0.1:8000/maya-v2/ask-with-model/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "什麼是Java",
+    "model_name": "gpt-4.1-nano",
+    "sync": true,
+    "use_knowledge_base": true
+  }'
+
+# 4. 測試一般問題
+curl -X POST "http://127.0.0.1:8000/maya-v2/ask-with-model/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "如何學習編程",
+    "model_name": "gpt-4o-mini",
+    "sync": true,
+    "use_knowledge_base": true
+  }'
+```
+
 ## 開發命令
 
 ### 基本
@@ -378,30 +430,72 @@ poetry run celery -A config inspect stats
 poetry run celery -A config inspect active
 ```
 
-### 發送訊息範例
+### 新的 API 使用範例
+
+#### 1. 獲取可用模型列表
 ```bash
-# 使用預設 AI 模型
-curl -X POST "http://127.0.0.1:8000/api/v1/conversations/{conversation_id}/send_message/" \
-  -H "Authorization: Bearer {token}" \
+curl -X GET "http://127.0.0.1:8000/maya-v2/available-models/"
+```
+
+#### 2. 使用指定模型進行對話（推薦）
+```bash
+# 使用 GPT-4.1-nano 模型
+curl -X POST "http://127.0.0.1:8000/maya-v2/ask-with-model/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "什麼是Java",
+    "model_name": "gpt-4.1-nano",
+    "sync": true,
+    "use_knowledge_base": true
+  }'
+
+# 使用 GPT-4o-mini 模型
+curl -X POST "http://127.0.0.1:8000/maya-v2/ask-with-model/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "如何實現多線程",
+    "model_name": "gpt-4o-mini",
+    "sync": true,
+    "use_knowledge_base": true
+  }'
+```
+
+#### 3. 添加新的 AI 模型
+```bash
+curl -X POST "http://127.0.0.1:8000/maya-v2/add-model/"
+```
+
+#### 4. 傳統對話 API（已棄用）
+```bash
+# 創建對話
+curl -X POST "http://127.0.0.1:8000/maya-v2/conversations/" \
+  -H "Content-Type: application/json" \
+  -d '{"title": "新對話"}'
+
+# 發送訊息
+curl -X POST "http://127.0.0.1:8000/maya-v2/conversations/{conversation_id}/send_message/" \
   -H "Content-Type: application/json" \
   -d '{"content": "你好，請幫我解答問題"}'
 
-# 指定 AI 模型
-curl -X POST "http://127.0.0.1:8000/api/v1/conversations/{conversation_id}/send_message/" \
-  -H "Authorization: Bearer {token}" \
-  -H "Content-Type: application/json" \
-  -d '{"content": "你好，請幫我解答問題", "ai_model_id": 1}'
+# 獲取對話訊息
+curl -X GET "http://127.0.0.1:8000/maya-v2/conversations/{conversation_id}/messages/"
 ```
 
-#### 獲取提供者配置
-```bash
-# 獲取所有 AI 提供者配置
-curl -X GET "http://127.0.0.1:8000/api/v1/conversations/ai_providers/" \
-  -H "Authorization: Bearer {token}"
-
-# 獲取可用模型（包含不可用的）
-curl -X GET "http://127.0.0.1:8000/api/v1/ai-models/?include_inactive=true" \
-  -H "Authorization: Bearer {token}"
+```json
+{
+  "session_id": "qa-abc12345",
+  "conversation_id": "uuid-string",
+  "question": "什麼是Java",
+  "ai_model": {
+    "id": 3,
+    "name": "GPT-4.1 Nano",
+    "provider": "openai"
+  },
+  "status": "completed",
+  "ai_response": "Java是一種高級編程語言...",
+  "knowledge_used": true,
+  "message": "AI回复已完成"
+}
 ```
 
 #### 配置管理命令

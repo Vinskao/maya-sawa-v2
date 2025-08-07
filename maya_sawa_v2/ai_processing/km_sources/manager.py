@@ -16,6 +16,27 @@ class KMSourceManager:
         self.sources: List[BaseKMSource] = []
         self._sources_by_name: Dict[str, BaseKMSource] = {}
         self._sources_by_type: Dict[str, BaseKMSource] = {}
+        self._setup_default_sources()
+
+    def _setup_default_sources(self):
+        """設置默認的知識庫源"""
+        try:
+            # 導入並添加編程知識庫源
+            from .programming import ProgrammingKMSource
+            programming_source = ProgrammingKMSource()
+            self.add_source(programming_source)
+            logger.info("已添加編程知識庫源")
+        except Exception as e:
+            logger.error(f"設置編程知識庫源失敗: {e}")
+
+        try:
+            # 導入並添加一般知識庫源
+            from .general import GeneralKMSource
+            general_source = GeneralKMSource()
+            self.add_source(general_source)
+            logger.info("已添加一般知識庫源")
+        except Exception as e:
+            logger.error(f"設置一般知識庫源失敗: {e}")
 
     def add_source(self, source: BaseKMSource) -> None:
         """添加知识库源"""
