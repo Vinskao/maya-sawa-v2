@@ -11,7 +11,6 @@ class AIProvider(ABC):
 
     @abstractmethod
     def generate_response(self, message: str, context: Optional[Dict[str, Any]] = None) -> str:
-        """生成 AI 回應"""
         pass
 
 
@@ -32,11 +31,54 @@ class OpenAIProvider(AIProvider):
             if not self.api_key:
                 raise ValueError("OpenAI API key not found")
 
-            # 配置 OpenAI 客戶端
-            client = OpenAI(
-                api_key=self.api_key,
-                base_url=self.api_base if self.api_base != 'https://api.openai.com/v1' else None
-            )
+            # 配置 OpenAI 客戶端 - 只傳遞支援的參數
+            client_kwargs = {
+                'api_key': self.api_key
+            }
+
+            # 只有在非預設 URL 時才添加 base_url
+            if self.api_base and self.api_base != 'https://api.openai.com/v1':
+                client_kwargs['base_url'] = self.api_base
+
+            # 只有在有組織 ID 時才添加
+            if self.organization:
+                client_kwargs['organization'] = self.organization
+
+            # 調試信息
+            logger.info(f"Creating OpenAI client with kwargs: {client_kwargs}")
+
+            # 確保沒有傳遞不支援的參數，並明確排除 proxy 相關參數
+            supported_params = {'api_key', 'base_url', 'organization', 'timeout', 'max_retries'}
+            excluded_params = {'proxies', 'http_proxy', 'https_proxy', 'no_proxy'}
+            filtered_kwargs = {k: v for k, v in client_kwargs.items()
+                             if k in supported_params and k not in excluded_params}
+
+            # 臨時清除環境變數中的 proxy 設定
+            original_proxy_vars = {}
+            for var in ['HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy']:
+                if var in os.environ:
+                    original_proxy_vars[var] = os.environ[var]
+                    del os.environ[var]
+
+            try:
+                # 使用最簡單的初始化方式，只傳遞必要的參數
+                client = OpenAI(api_key=self.api_key)
+
+                # 如果需要設置其他參數，在初始化後單獨設置
+                if self.organization:
+                    client.organization = self.organization
+
+            except Exception as e:
+                logger.error(f"OpenAI client initialization error: {str(e)}")
+                # 如果還是有問題，嘗試不傳遞任何參數
+                client = OpenAI()
+                client.api_key = self.api_key
+                if self.organization:
+                    client.organization = self.organization
+            finally:
+                # 恢復原始環境變數
+                for var, value in original_proxy_vars.items():
+                    os.environ[var] = value
 
             # 構建對話歷史
             messages = []
@@ -146,25 +188,11 @@ class QwenProvider(AIProvider):
 
 
 class MockProvider(AIProvider):
-    """模擬 AI 提供者（用於測試）"""
+    """模擬 AI 提供者 - 用於測試"""
 
     def generate_response(self, message: str, context: Optional[Dict[str, Any]] = None) -> str:
-        """模擬 AI 回應"""
-        import random
-        import time
-
-        # 模擬處理時間
-        time.sleep(random.uniform(1, 3))
-
-        responses = [
-            "感謝您的詢問，我理解您的問題。根據我的分析，建議您...",
-            "這是一個很好的問題。讓我為您詳細說明...",
-            "根據您提供的資訊，我建議您可以考慮以下方案...",
-            "我理解您的需求，以下是相關的解決方案...",
-            f"您提到的是關於「{message[:20]}...」的問題，讓我為您分析一下...",
-        ]
-
-        return random.choice(responses)
+        """生成模擬回應"""
+        return f"這是一個模擬回應。你問的是：{message}"
 
 
 def get_ai_provider(provider_name: str, config: Dict[str, Any] = None) -> AIProvider:

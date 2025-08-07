@@ -363,6 +363,8 @@ poetry run python manage.py setup_ai_models
 # 運行測試
 poetry run pytest
 
+http://127.0.0.1:8000/api/redoc/
+
 # 類型檢查
 poetry run mypy maya_sawa_v2
 ```
