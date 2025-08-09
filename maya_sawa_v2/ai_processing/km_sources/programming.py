@@ -5,7 +5,12 @@
 
 import logging
 import asyncio
-from typing import Dict, Any, List
+import re
+import json
+import math
+import os
+from typing import Dict, Any, List, Tuple, Optional
+import psycopg
 from .base import BaseKMSource, KMQuery, KMResult
 
 try:
@@ -64,23 +69,34 @@ class ProgrammingKMSource(BaseKMSource):
             current_time - self._cache_timestamp > self.cache_timeout):
 
             try:
-                # 使用同步方式运行异步方法
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # 如果在异步上下文中，创建新的事件循环
+                # 優先使用當前執行緒的 running loop 檢測
+                try:
+                    _ = asyncio.get_running_loop()
+                    # 有 running loop：改用執行緒中執行 asyncio.run，避免 RuntimeError
                     import concurrent.futures
                     with concurrent.futures.ThreadPoolExecutor() as executor:
-                        future = executor.submit(asyncio.run, self._fetch_articles_from_paprika())
+                        future = executor.submit(lambda: asyncio.run(self._fetch_articles_from_paprika()))
                         self._articles_cache = future.result()
-                else:
+                except RuntimeError:
+                    # 無 running loop：可直接 asyncio.run
                     self._articles_cache = asyncio.run(self._fetch_articles_from_paprika())
 
                 self._cache_timestamp = current_time
 
             except Exception as e:
-                logger.error("获取文章缓存失败: %s", str(e))
-                if self._articles_cache is None:
-                    self._articles_cache = []
+                # 最後回退：手動建立事件迴圈
+                try:
+                    loop = asyncio.new_event_loop()
+                    try:
+                        asyncio.set_event_loop(loop)
+                        self._articles_cache = loop.run_until_complete(self._fetch_articles_from_paprika())
+                    finally:
+                        loop.close()
+                    self._cache_timestamp = current_time
+                except Exception as e2:
+                    logger.error("获取文章缓存失败: %s / %s", str(e), str(e2))
+                    if self._articles_cache is None:
+                        self._articles_cache = []
 
         return self._articles_cache or []
 
@@ -96,52 +112,233 @@ class ProgrammingKMSource(BaseKMSource):
                 query.metadata.get('km_source') == 'programming_km')
 
     def search(self, query: KMQuery) -> List[KMResult]:
-        """搜索编程知识库 - 简化版，让AI处理相关性"""
-        results = []
+        """搜索编程知识库，支持中英文與回退策略，並回傳引用資訊"""
+        results: List[KMResult] = []
 
         try:
-            # 1. 获取所有文章
-            all_articles = self._get_cached_articles()
+            # 1) 先嘗試直接用資料庫的向量進行檢索
+            all_articles: List[Dict[str, Any]] = []
 
-            # 2. 简单文本匹配 - 让AI处理相关性
-            query_words = [word.strip() for word in query.query.lower().split() if len(word.strip()) > 2]
-            relevant_articles = []
+            # 2) 優先使用向量相似度（若可計算查詢向量）
+            query_vec = self._compute_query_embedding_safe(query.query)
 
+            # 3) 嘗試從資料庫檢索（過濾測試文章）
+            if query_vec is not None:
+                db_articles = self._search_db_by_embedding(query_vec, k=5, threshold=0.0)
+                all_articles = self._filter_test_articles(db_articles)
+                logger.info(f"從資料庫檢索到 {len(db_articles)} 篇文章，過濾後剩 {len(all_articles)} 篇")
+
+            # 如果資料庫沒有足夠的文章，回退到 Paprika API
+            if len(all_articles) < 3:
+                paprika_articles = self._get_cached_articles()
+                paprika_filtered = self._filter_test_articles(paprika_articles)
+                logger.info(f"從 Paprika API 檢索到 {len(paprika_articles)} 篇文章，過濾後剩 {len(paprika_filtered)} 篇")
+                # 合併結果，優先使用資料庫的結果
+                all_articles.extend(paprika_filtered)
+                # 去重（基於 file_path）
+                seen_paths = set()
+                unique_articles = []
+                for article in all_articles:
+                    file_path = article.get('file_path', '')
+                    if file_path and file_path not in seen_paths:
+                        seen_paths.add(file_path)
+                        unique_articles.append(article)
+                all_articles = unique_articles
+
+            # 如果還是沒有文章，使用原始的 Paprika 結果（但過濾測試）
+            if not all_articles:
+                all_articles = self._filter_test_articles(self._get_cached_articles())
+
+            # 4) 萃取查詢關鍵字（支援中文句子中夾英數，如 Java, Python, .NET, C#）
+            query_text = (query.query or '').lower()
+            alpha_num_terms = re.findall(r"[a-z0-9\+\#\.\-]+", query_text)
+            split_terms = [w.strip() for w in query_text.split() if len(w.strip()) > 1]
+            query_terms = list({t for t in (alpha_num_terms + split_terms) if t})
+
+            # 5) 構建相似度/關聯度分數
+            #    若有 query_vec，使用餘弦相似度；否則使用關鍵詞匹配分數
+            scored: List[Tuple[Dict[str, Any], float]] = []
             for article in all_articles:
-                content = article.get('content', '').lower()
+                content_l = (article.get('content') or '').lower()
+                path_l = (article.get('file_path') or '').lower()
 
-                # 简单检查：查询词汇是否在文章中出现
-                if any(word in content for word in query_words):
-                    relevant_articles.append(article)
+                sim_score: float = 0.0
+                matched_terms: List[str] = []
 
-                # 限制搜索范围，提高效率
-                if len(relevant_articles) >= 10:
-                    break
+                if query_vec is not None:
+                    art_vec = self._parse_embedding(article.get('embedding'))
+                    if art_vec is not None:
+                        sim_score = self._cosine_similarity(query_vec, art_vec)
+                else:
+                    # 關鍵詞匹配作為回退
+                    term_score = 0
+                    for t in query_terms:
+                        if t and (t in content_l or t in path_l):
+                            term_score += 1
+                            matched_terms.append(t)
+                    sim_score = float(term_score)
 
-            # 3. 转换为KMResult格式，返回前5篇
-            for article in relevant_articles[:5]:
+                article['_match_score'] = sim_score
+                article['_matched_terms'] = matched_terms
+                scored.append((article, sim_score))
+
+            # 6) 取得相關文章（若無匹配，回退取前3篇以確保有引用輸出）
+            scored.sort(key=lambda x: x[1], reverse=True)
+            if scored and scored[0][1] > 0:
+                relevant_articles = [a for a, s in scored if s > 0][:5]
+                fallback_used = False
+            else:
+                # 回退策略：若 DB 取不到或無匹配，改用 Paprika API 快取
+                paprika_articles = self._get_cached_articles()
+                if paprika_articles:
+                    # 簡單取前三篇保證有引用
+                    relevant_articles = paprika_articles[:3]
+                    fallback_used = True
+                else:
+                    relevant_articles = []
+                    fallback_used = True
+
+            # 6) 組裝 KMResult
+            for article in relevant_articles:
+                confidence = 0.4 if fallback_used else 0.8
+                relevance_score = float(article.get('_match_score', 0))
+                # 組裝工作站可瀏覽的來源連結
+                file_path = article.get('file_path') or ''
+                work_url = f"https://peoplesystem.tatdvsonorth.com/work/{file_path}" if file_path else self.paprika_api_url
+
                 results.append(KMResult(
                     content=article.get('content', ''),
                     source=f"paprika_{article.get('id', 'unknown')}",
-                    confidence=0.8,  # 固定置信度
-                    relevance_score=1.0,  # 让后续AI处理相关性
+                    confidence=confidence,
+                    relevance_score=relevance_score,
                     metadata={
                         'article_id': article.get('id'),
-                        'file_path': article.get('file_path'),
+                        'file_path': file_path,
                         'file_date': article.get('file_date'),
                         'source_type': 'paprika_api',
-                        'title': self._extract_title_from_content(article.get('content', ''))
+                        'title': self._extract_title_from_content(article.get('content', '')),
+                        'source_url': work_url,
+                        'provider': 'Paprika',
+                        'matched_terms': article.get('_matched_terms', []),
+                        'fallback_used': fallback_used,
+                        'similarity': relevance_score,
+                        'embedding_model': os.getenv('OPENAI_EMBEDDING_MODEL', 'text-embedding-3-small') if query_vec is not None else None
                     }
                 ))
 
-            logger.info("从paprika API找到 %d 篇相关文章，返回前5篇", len(relevant_articles))
+            logger.info("從 paprika API 產生 %d 筆引用（fallback=%s）", len(results), fallback_used)
 
         except Exception as e:
-            logger.error("搜索paprika文章时发生错误: %s", str(e))
-            # API失败时返回空结果
+            logger.error("搜索paprika文章時發生錯誤: %s", str(e))
             results = []
 
         return results
+
+    # ========== Embedding helpers ==========
+    def _compute_query_embedding_safe(self, text: str) -> Optional[List[float]]:
+        """嘗試用 OpenAI 產生查詢向量，失敗則回傳 None。"""
+        try:
+            api_key = os.getenv('OPENAI_API_KEY')
+            if not api_key:
+                return None
+            model = os.getenv('OPENAI_EMBEDDING_MODEL', 'text-embedding-3-small')
+            from openai import OpenAI
+            client = OpenAI(api_key=api_key)
+            resp = client.embeddings.create(model=model, input=text or "")
+            vec = resp.data[0].embedding
+            if isinstance(vec, list) and vec:
+                return [float(x) for x in vec]
+            return None
+        except Exception:
+            return None
+
+    def _parse_embedding(self, emb_field: Any) -> Optional[List[float]]:
+        """解析 paprika 回傳的 embedding 欄位，支援字串或陣列。"""
+        try:
+            if emb_field is None:
+                return None
+            if isinstance(emb_field, list):
+                return [float(x) for x in emb_field]
+            if isinstance(emb_field, str):
+                # 移除空白並解析 JSON 陣列字串
+                s = emb_field.strip()
+                return [float(x) for x in json.loads(s)]
+            return None
+        except Exception:
+            return None
+
+    def _cosine_similarity(self, v1: List[float], v2: List[float]) -> float:
+        """計算餘弦相似度，長度不等時以最短長度對齊。"""
+        n = min(len(v1), len(v2))
+        if n == 0:
+            return 0.0
+        dot = 0.0
+        norm1 = 0.0
+        norm2 = 0.0
+        for i in range(n):
+            a = float(v1[i])
+            b = float(v2[i])
+            dot += a * b
+            norm1 += a * a
+            norm2 += b * b
+        if norm1 == 0.0 or norm2 == 0.0:
+            return 0.0
+        return dot / (math.sqrt(norm1) * math.sqrt(norm2))
+
+    # ========== Database helpers ==========
+    def _search_db_by_embedding(self, query_vec: List[float], k: int = 5, threshold: float = 0.0) -> List[Dict[str, Any]]:
+        """用 PostgreSQL pgvector 做語義檢索。"""
+        conn_str = os.getenv('POSTGRES_CONNECTION_STRING') or os.getenv('DATABASE_URL')
+        if not conn_str:
+            return []
+        embedding_str = '[' + ','.join(map(str, query_vec)) + ']'
+        rows: List[Dict[str, Any]] = []
+        try:
+            with psycopg.connect(conn_str) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT
+                            id,
+                            file_path,
+                            content,
+                            file_date,
+                            1 - (embedding <=> %s::vector) AS similarity
+                        FROM articles
+                        WHERE 1 - (embedding <=> %s::vector) > %s
+                        AND file_path NOT LIKE 'test/%%'
+                        AND file_path NOT LIKE '%%test%%'
+                        ORDER BY embedding <=> %s::vector
+                        LIMIT %s
+                        """,
+                        (embedding_str, embedding_str, threshold, embedding_str, k)
+                    )
+                    for r in cur.fetchall():
+                        rows.append({
+                            'id': r[0],
+                            'file_path': r[1],
+                            'content': r[2],
+                            'file_date': r[3].isoformat() if r[3] else None,
+                            '_match_score': float(r[4] or 0.0),
+                            '_matched_terms': []
+                        })
+        except Exception as e:
+            logger.error("DB 向量檢索失敗: %s", str(e))
+            return []
+        return rows
+
+    def _filter_test_articles(self, articles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """過濾掉測試文章，只保留正式技術文檔"""
+        filtered = []
+        for article in articles:
+            file_path = article.get('file_path', '')
+            # 排除測試相關的路徑
+            if (not file_path.startswith('test/') and
+                'test' not in file_path.lower() and
+                not file_path.endswith('test.md') and
+                not file_path.endswith('test.txt')):
+                filtered.append(article)
+        return filtered
 
     def _extract_title_from_content(self, content: str) -> str:
         """从内容中提取标题"""

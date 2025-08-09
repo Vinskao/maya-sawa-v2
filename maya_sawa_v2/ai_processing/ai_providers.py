@@ -80,10 +80,23 @@ class OpenAIProvider(AIProvider):
                 for var, value in original_proxy_vars.items():
                     os.environ[var] = value
 
-            # 構建對話歷史
+            # 構建對話歷史與知識庫上下文
             messages = []
             if context and 'conversation_history' in context:
                 messages.extend(context['conversation_history'])
+
+            system_content = None
+            if context:
+                parts = []
+                if context.get('system_prompt'):
+                    parts.append(str(context['system_prompt']))
+                if context.get('knowledge_context'):
+                    parts.append("以下是與用戶問題相關的知識庫內容，請作為主要依據回答：\n" + str(context['knowledge_context']))
+                if parts:
+                    system_content = "\n\n".join(parts)
+
+            if system_content:
+                messages.insert(0, {"role": "system", "content": system_content})
 
             messages.append({"role": "user", "content": message})
 

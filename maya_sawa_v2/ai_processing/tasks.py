@@ -32,7 +32,7 @@ def process_ai_response(self, task_id):
             conversation_id=str(conversation.id),
             current_type=conversation.conversation_type
         )
-        
+
         # 如果分類結果建議更新對話類型，則更新
         if classification_result['should_update']:
             conversation.conversation_type = classification_result['conversation_type']
@@ -98,8 +98,8 @@ def process_ai_response(self, task_id):
         processing_task.save()
 
 
-def process_ai_response_sync(user_message, ai_model):
-    """同步处理AI回应"""
+def process_ai_response_sync(user_message, ai_model, knowledge_context: str | None = None):
+    """同步处理AI回应，支持外部知識上下文"""
     try:
         start_time = time.time()
 
@@ -114,7 +114,7 @@ def process_ai_response_sync(user_message, ai_model):
             conversation_id=str(conversation.id),
             current_type=conversation.conversation_type
         )
-        
+
         # 如果分类结果建议更新对话类型，则更新
         if classification_result['should_update']:
             conversation.conversation_type = classification_result['conversation_type']
@@ -136,6 +136,8 @@ def process_ai_response_sync(user_message, ai_model):
             'system_prompt': get_system_prompt(conversation.conversation_type),
             'classification_metadata': classification_result['metadata']
         }
+        if knowledge_context:
+            context['knowledge_context'] = knowledge_context
 
         # 使用配置的 AI 提供者
         provider = get_ai_provider(
@@ -144,10 +146,7 @@ def process_ai_response_sync(user_message, ai_model):
         )
 
         # 调用 AI API
-        response = provider.generate_response(
-            user_message.content,
-            context
-        )
+        response = provider.generate_response(user_message.content, context)
 
         processing_time = time.time() - start_time
 

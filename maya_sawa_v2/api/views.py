@@ -256,16 +256,22 @@ def ask_with_model(request):
 
                 # 如果使用知識庫，先搜索相關知識
         knowledge_context = ""
+        knowledge_citations = []
         if use_knowledge_base:
             try:
                 from maya_sawa_v2.ai_processing.km_sources.manager import KMSourceManager
                 from maya_sawa_v2.ai_processing.km_sources.base import KMQuery
 
-                # 創建查詢對象
+                # 創建查詢對象（需要 user_id 與 conversation_id）
                 query = KMQuery(
                     query=question,
-                    domain='programming',  # 根據問題類型設置
-                    metadata={'km_source': 'programming_km'}
+                    user_id=conversation.user_id,
+                    conversation_id=str(conversation.id),
+                    domain='programming',  # 可根據實際分類結果覆蓋
+                    metadata={
+                        'km_source': 'programming_km',
+                        'session_id': conversation.session_id
+                    }
                 )
 
                 km_manager = KMSourceManager()
@@ -274,10 +280,27 @@ def ask_with_model(request):
                 km_results = km_manager.search_all_suitable(query)
                 logger.info(f"知識庫搜索完成，找到 {len(km_results)} 個結果")
 
-                if km_results:
+                # 僅展示 Paprika 文章做為引用，且來源連結固定為 work URL
+                paprika_results = [r for r in km_results if (r.metadata or {}).get('source_type') == 'paprika_api']
+                if paprika_results:
                     knowledge_context = "\n\n相關知識庫內容：\n"
-                    for i, result in enumerate(km_results[:3]):  # 只取前3個結果
-                        knowledge_context += f"{i+1}. {result.content[:200]}...\n"
+                    for i, result in enumerate(paprika_results[:3]):  # 只取前3個結果
+                        meta = (result.metadata or {})
+                        title = meta.get('title') or '參考文章'
+                        file_path = meta.get('file_path') or ''
+                        work_url = f"https://peoplesystem.tatdvsonorth.com/work/{file_path}" if file_path else "https://peoplesystem.tatdvsonorth.com/work/"
+                        knowledge_context += f"{i+1}. {title} ({file_path})\n{result.content[:200]}...\n"
+
+                        # 準備引用資訊（寫死為 work URL）
+                        knowledge_citations.append({
+                            'article_id': meta.get('article_id'),
+                            'title': title,
+                            'file_path': file_path,
+                            'file_date': meta.get('file_date'),
+                            'source': result.source,
+                            'source_url': work_url,
+                            'provider': meta.get('provider') or 'Paprika'
+                        })
 
                     logger.info(f"找到 {len(km_results)} 個知識庫結果")
                 else:
@@ -290,7 +313,7 @@ def ask_with_model(request):
         if sync:
             try:
                 # 同步處理
-                response = process_ai_response_sync(user_message, ai_model)
+                response = process_ai_response_sync(user_message, ai_model, knowledge_context=knowledge_context)
 
                 # 如果有知識庫內容，將其添加到回應中
                 if knowledge_context:
@@ -308,6 +331,7 @@ def ask_with_model(request):
                     'status': 'completed',
                     'ai_response': response,
                     'knowledge_used': bool(knowledge_context),
+                    'knowledge_citations': knowledge_citations,
                     'message': 'AI回复已完成'
                 })
 
@@ -317,21 +341,17 @@ def ask_with_model(request):
                     'error': f'AI 處理失敗: {str(e)}'
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         else:
-            # 異步處理
-            task = process_ai_response.delay(user_message.id)
+            # 目前暫不支援異步處理，避免未建立 ProcessingTask 導致錯誤
             return Response({
-                'session_id': f"qa-{uuid.uuid4().hex[:8]}",
+                'error': '目前僅支援同步處理，請將 sync 設為 true',
                 'conversation_id': str(conversation.id),
                 'question': question,
                 'ai_model': {
                     'id': ai_model.id,
                     'name': ai_model.name,
                     'provider': ai_model.provider
-                },
-                'status': 'processing',
-                'task_id': str(task.id),
-                'message': 'AI處理已開始'
-            })
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
 
     except Exception as e:
         logger.error(f"API 錯誤: {str(e)}")
