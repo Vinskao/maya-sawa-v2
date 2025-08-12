@@ -29,7 +29,8 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        env_file = '.env'
+        # 使用當前工作目錄的 .env，方便在測試中切換目錄
+        env_file = os.path.join(os.getcwd(), '.env')
 
         if not os.path.exists(env_file):
             self.stdout.write(
