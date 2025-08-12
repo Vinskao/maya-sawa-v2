@@ -351,3 +351,20 @@ API_ALLOWED_ORIGINS = env.list('API_ALLOWED_ORIGINS', default=['http://localhost
 # API速率限制设置
 API_RATE_LIMIT_ENABLED = env.bool('API_RATE_LIMIT_ENABLED', default=False)
 API_RATE_LIMIT_PER_MINUTE = env.int('API_RATE_LIMIT_PER_MINUTE', default=60)
+
+# DRF Throttling (conditional enable)
+# ------------------------------------------------------------------------------
+if API_RATE_LIMIT_ENABLED:
+    # Allow overriding user/anon separately; fall back to global per-minute
+    _user_per_minute = env.int('API_RATE_LIMIT_USER_PER_MINUTE', default=API_RATE_LIMIT_PER_MINUTE)
+    _anon_default = max(int(API_RATE_LIMIT_PER_MINUTE / 2), 1)
+    _anon_per_minute = env.int('API_RATE_LIMIT_ANON_PER_MINUTE', default=_anon_default)
+
+    REST_FRAMEWORK['DEFAULT_THROTTLE_CLASSES'] = [
+        'rest_framework.throttling.UserRateThrottle',
+        'rest_framework.throttling.AnonRateThrottle',
+    ]
+    REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'] = {
+        'user': f"{_user_per_minute}/min",
+        'anon': f"{_anon_per_minute}/min",
+    }
