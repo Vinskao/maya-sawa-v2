@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from maya_sawa_v2.conversations.models import Conversation, Message
 from maya_sawa_v2.ai_processing.models import ProcessingTask, AIModel
+from maya_sawa_v2.api.services.message_service import MessageAppService
 from maya_sawa_v2.ai_processing.utils import AIProviderConfig, ModelNameMapper
 
 
@@ -76,30 +77,12 @@ class CreateMessageSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         conversation = self.context['conversation']
         ai_model_id = validated_data.pop('ai_model_id', None)
-
-        message = Message.objects.create(
+        service = MessageAppService()
+        message = service.create_user_message_and_enqueue(
             conversation=conversation,
-            message_type='user',
-            content=validated_data['content']
+            content=validated_data['content'],
+            ai_model_id=ai_model_id,
         )
-
-        # 觸發 AI 處理任務
-        from maya_sawa_v2.ai_processing.tasks import process_ai_response
-
-        # 獲取 AI 模型（優先使用前端指定的，否則使用預設）
-        if ai_model_id:
-            ai_model = AIModel.objects.get(id=ai_model_id, is_active=True)
-        else:
-            ai_model = AIModel.objects.filter(is_active=True).first()
-
-        if ai_model:
-            task = ProcessingTask.objects.create(
-                conversation=conversation,
-                message=message,
-                ai_model=ai_model
-            )
-            process_ai_response.delay(task.id)
-
         return message
 
 

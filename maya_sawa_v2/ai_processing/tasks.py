@@ -6,6 +6,7 @@ from .models import ProcessingTask
 from maya_sawa_v2.conversations.models import Message, Conversation
 from .ai_providers import get_ai_provider
 from .chain.service import conversation_type_service
+from maya_sawa_v2.ai_processing.services.ai_response_service import AIResponseService
 
 logger = logging.getLogger(__name__)
 
@@ -16,78 +17,12 @@ def process_ai_response(self, task_id):
     try:
         processing_task = ProcessingTask.objects.get(id=task_id)
         processing_task.status = 'processing'
-        processing_task.save()
+        processing_task.save(update_fields=['status'])
 
-        start_time = time.time()
-
-        # 獲取對話歷史作為上下文
-        conversation = processing_task.conversation
-        messages = conversation.messages.filter(message_type__in=['user', 'ai']).order_by('created_at')
-
-        # 使用 chain 分類服務確定對話類型
-        user_message = processing_task.message.content
-        classification_result = conversation_type_service.classify_conversation_type(
-            message=user_message,
-            user_id=conversation.user.id,
-            conversation_id=str(conversation.id),
-            current_type=conversation.conversation_type
-        )
-
-        # 如果分類結果建議更新對話類型，則更新
-        if classification_result['should_update']:
-            conversation.conversation_type = classification_result['conversation_type']
-            conversation.save()
-            logger.info(f"Updated conversation type to: {classification_result['conversation_type']} "
-                       f"(confidence: {classification_result['confidence']}, reason: {classification_result['reason']})")
-
-        # 構建對話歷史（僅保留最近的 10 條訊息）
-        conversation_history = []
-        for msg in messages[-10:]:
-            role = "user" if msg.message_type == "user" else "assistant"
-            conversation_history.append({"role": role, "content": msg.content})
-
-        # 構建上下文
-        context = {
-            'conversation_history': conversation_history,
-            'conversation_type': conversation.conversation_type,
-            'system_prompt': get_system_prompt(conversation.conversation_type),
-            'classification_metadata': classification_result['metadata']
-        }
-
-        # 使用配置的 AI 提供者
-        provider = get_ai_provider(
-            processing_task.ai_model.provider,
-            processing_task.ai_model.config
-        )
-
-        # 調用 AI API
-        response = provider.generate_response(
-            processing_task.message.content,
-            context
-        )
-
-        processing_time = time.time() - start_time
-
-        # 創建 AI 回應訊息
-        ai_message = Message.objects.create(
-            conversation=processing_task.conversation,
-            message_type='ai',
-            content=response,
-            metadata={
-                'ai_model': processing_task.ai_model.name,
-                'provider': processing_task.ai_model.provider,
-                'processing_time': processing_time,
-                'task_id': str(self.request.id),
-                'classification_result': classification_result
-            }
-        )
-
-        # 更新任務狀態
-        processing_task.status = 'completed'
-        processing_task.result = response
-        processing_task.processing_time = processing_time
-        processing_task.completed_at = timezone.now()
-        processing_task.save()
+        service = AIResponseService()
+        service.process_task(processing_task, extra_context={
+            'system_prompt': get_system_prompt(processing_task.conversation.conversation_type)
+        })
 
         logger.info(f"AI processing completed for task {task_id}")
 
@@ -95,7 +30,7 @@ def process_ai_response(self, task_id):
         logger.error(f"AI processing failed for task {task_id}: {str(e)}")
         processing_task.status = 'failed'
         processing_task.error_message = str(e)
-        processing_task.save()
+        processing_task.save(update_fields=['status', 'error_message'])
 
 
 def process_ai_response_sync(user_message, ai_model, knowledge_context: str | None = None):
