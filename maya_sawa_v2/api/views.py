@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db import transaction
+from django.contrib.auth import get_user_model
 from maya_sawa_v2.conversations.models import Conversation, Message
 from maya_sawa_v2.ai_processing.models import AIModel
 from maya_sawa_v2.ai_processing.utils import AIProviderConfig, ModelNameMapper
@@ -234,6 +235,15 @@ def ask_with_model(request):
                     'available_models': list(available_models)
                 }, status=status.HTTP_400_BAD_REQUEST)
 
+        # 準備會話用戶（若無預設用戶，建立一個輕量帳號）
+        UserModel = get_user_model()
+        user = UserModel.objects.filter(id=1).first()
+        if not user:
+            user = UserModel.objects.filter(username='api_default').first()
+        if not user:
+            # 建立不可登入的預設用戶
+            user = UserModel.objects.create_user(username=f"api_default")
+
         # 創建會話和用戶訊息
         with transaction.atomic():
             # 生成唯一的 session_id
@@ -241,7 +251,7 @@ def ask_with_model(request):
 
             # 創建會話
             conversation = Conversation.objects.create(
-                user_id=1,  # 預設用戶
+                user=user,
                 session_id=session_id,
                 conversation_type='general',
                 title=f"QA-{session_id}"

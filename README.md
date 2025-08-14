@@ -478,7 +478,7 @@ curl -X POST "http://127.0.0.1:8000/maya-v2/ask-with-model/" \
   -H "Content-Type: application/json" \
   -d '{
     "question": "如何學習編程",
-    "model_name": "gpt-4o-mini",
+    "model_name": "gpt-4.1-nano",
     "sync": true,
     "use_knowledge_base": true
   }'

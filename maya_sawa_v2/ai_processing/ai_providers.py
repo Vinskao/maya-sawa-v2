@@ -117,20 +117,27 @@ class OpenAIProvider(AIProvider):
             return f"抱歉，AI 服務暫時無法使用。錯誤：{str(e)}"
 
 
+_UNSET = object()
+
+
 class GeminiProvider(AIProvider):
     """Google Gemini API 提供者"""
 
-    def __init__(self, api_key: str = None, model: str = "gemini-1.5-flash"):
-        self.api_key = api_key or os.getenv('GOOGLE_API_KEY')
+    def __init__(self, api_key: str | object = _UNSET, model: str = "gemini-1.5-flash"):
+        # 未提供參數時，回退到環境變數；明確傳入 None 則不回退（便於測試）
+        if api_key is _UNSET:
+            self.api_key = os.getenv('GOOGLE_API_KEY')
+        else:
+            self.api_key = api_key  # could be None
         self.model = model
 
     def generate_response(self, message: str, context: Optional[Dict[str, Any]] = None) -> str:
         """使用 Gemini API 生成回應"""
+        # 明確在無 API key 時回覆固定錯誤字串，確保測試穩定
+        if not self.api_key:
+            return "Google API key not found"
         try:
             import google.generativeai as genai
-
-            if not self.api_key:
-                raise ValueError("Google API key not found")
 
             genai.configure(api_key=self.api_key)
             model = genai.GenerativeModel(self.model)
@@ -159,17 +166,21 @@ class GeminiProvider(AIProvider):
 class QwenProvider(AIProvider):
     """Qwen API 提供者"""
 
-    def __init__(self, api_key: str = None, model: str = "qwen-turbo"):
-        self.api_key = api_key or os.getenv('QWEN_API_KEY')
+    def __init__(self, api_key: str | object = _UNSET, model: str = "qwen-turbo"):
+        # 未提供參數時，回退到環境變數；明確傳入 None 則不回退（便於測試）
+        if api_key is _UNSET:
+            self.api_key = os.getenv('QWEN_API_KEY')
+        else:
+            self.api_key = api_key  # could be None
         self.model = model
 
     def generate_response(self, message: str, context: Optional[Dict[str, Any]] = None) -> str:
         """使用 Qwen API 生成回應"""
+        # 明確在無 API key 時回覆固定錯誤字串，確保測試穩定
+        if not self.api_key:
+            return "Qwen API key not found"
         try:
             import dashscope
-
-            if not self.api_key:
-                raise ValueError("Qwen API key not found")
 
             dashscope.api_key = self.api_key
 

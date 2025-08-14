@@ -9,6 +9,8 @@ from django.utils import timezone
 from maya_sawa_v2.conversations.models import Conversation, Message
 from maya_sawa_v2.ai_processing.models import ProcessingTask, AIModel
 from maya_sawa_v2.ai_processing.ai_providers import get_ai_provider
+from maya_sawa_v2.ai_processing.services.conversation_service import ConversationService
+from maya_sawa_v2.ai_processing.services.prompt_service import PromptService
 
 
 logger = logging.getLogger(__name__)
@@ -16,6 +18,10 @@ logger = logging.getLogger(__name__)
 
 class AIResponseService:
     """Coordinates AI response generation independent from Celery/serializers."""
+
+    def __init__(self, conversation_service: ConversationService | None = None, prompt_service: PromptService | None = None) -> None:
+        self.conversation_service = conversation_service or ConversationService()
+        self.prompt_service = prompt_service or PromptService()
 
     def build_conversation_history(self, conversation: Conversation, limit: int = 10) -> List[Dict[str, str]]:
         history: List[Dict[str, str]] = []
@@ -53,7 +59,22 @@ class AIResponseService:
     def process_task(self, task: ProcessingTask, extra_context: Optional[Dict[str, Any]] = None) -> str:
         start_time = time.time()
         conversation = task.conversation
-        context = self.build_context(conversation, extra_context)
+
+        # Classify conversation type and update if needed
+        classification_result = self.conversation_service.classify_and_update(
+            conversation=conversation,
+            message_text=task.message.content,
+        )
+
+        # Build context with system prompt and classification metadata
+        context_extra: Dict[str, Any] = {
+            "system_prompt": self.prompt_service.get_system_prompt(conversation.conversation_type),
+            "classification_metadata": classification_result.get("metadata", {}),
+        }
+        if extra_context:
+            context_extra.update(extra_context)
+
+        context = self.build_context(conversation, context_extra)
 
         provider = get_ai_provider(task.ai_model.provider, task.ai_model.config)
         response = provider.generate_response(task.message.content, context)
@@ -77,6 +98,43 @@ class AIResponseService:
         task.processing_time = processing_time
         task.completed_at = timezone.now()
         task.save(update_fields=["status", "result", "processing_time", "completed_at"])
+
+        return response
+
+    def process_sync(self, user_message: Message, ai_model: AIModel, knowledge_context: Optional[str] = None) -> str:
+        start_time = time.time()
+        conversation = user_message.conversation
+
+        classification_result = self.conversation_service.classify_and_update(
+            conversation=conversation,
+            message_text=user_message.content,
+        )
+
+        context_extra: Dict[str, Any] = {
+            "system_prompt": self.prompt_service.get_system_prompt(conversation.conversation_type),
+            "classification_metadata": classification_result.get("metadata", {}),
+        }
+        if knowledge_context:
+            context_extra["knowledge_context"] = knowledge_context
+
+        context = self.build_context(conversation, context_extra)
+
+        provider = get_ai_provider(ai_model.provider, ai_model.config)
+        response = provider.generate_response(user_message.content, context)
+
+        processing_time = time.time() - start_time
+
+        Message.objects.create(
+            conversation=conversation,
+            message_type="ai",
+            content=response,
+            metadata={
+                "ai_model": ai_model.name,
+                "provider": ai_model.provider,
+                "processing_time": processing_time,
+                "classification_result": classification_result,
+            },
+        )
 
         return response
 
