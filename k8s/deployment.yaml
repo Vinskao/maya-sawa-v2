@@ -19,7 +19,7 @@ spec:
         - name: dockerhub-credentials
       containers:
         - name: web
-          image: ${DOCKER_IMAGE:-papakao/maya-sawa-v2}:${DOCKER_TAG:-latest}
+          image: papakao/maya-sawa-v2:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
@@ -69,7 +69,7 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 30
         - name: worker
-          image: ${DOCKER_IMAGE:-papakao/maya-sawa-v2}:${DOCKER_TAG:-latest}
+          image: papakao/maya-sawa-v2:latest
           imagePullPolicy: IfNotPresent
           command: ["bash", "-lc", "celery -A config worker -l info -Q ${REDIS_QUEUE_MAYA_V2:-maya_v2}"]
           resources:

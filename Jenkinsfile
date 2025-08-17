@@ -128,12 +128,6 @@ pipeline {
                             sh '''
                                 set -e
 
-                                # Ensure envsubst is available
-                                if ! command -v envsubst >/dev/null 2>&1; then
-                                  (apt-get update && apt-get install -y --no-install-recommends gettext-base ca-certificates) >/dev/null 2>&1 || true
-                                  command -v envsubst >/dev/null 2>&1 || (apk add --no-cache gettext ca-certificates >/dev/null 2>&1 || true)
-                                fi
-
                                 kubectl cluster-info
 
                                 # Ensure Docker Hub imagePullSecret exists in default namespace
@@ -148,7 +142,7 @@ pipeline {
                                 test -f k8s/deployment.yaml || { echo "k8s/deployment.yaml missing"; exit 1; }
                                 test -f k8s/cronjob.yaml || echo "k8s/cronjob.yaml not found, skipping cronjobs"
 
-                                echo "Applying manifests with envsubst ..."
+                                echo "Applying manifests ..."
                                 # Export variables used by the templates
                                 export DATABASE_URL="postgres://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_DATABASE}?sslmode=require"
                                 export REDIS_URL="redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_CUSTOM_PORT}/0"
@@ -157,11 +151,11 @@ pipeline {
                                 export REDIS_QUEUE_MAYA_V2="${REDIS_QUEUE_MAYA:-maya_v2}"
 
                                 # Apply Deployment/Service/Worker
-                                envsubst < k8s/deployment.yaml | kubectl apply -f -
+                                kubectl apply -f k8s/deployment.yaml
 
                                 # Optionally apply CronJob if present
                                 if [ -f k8s/cronjob.yaml ]; then
-                                  envsubst < k8s/cronjob.yaml | kubectl apply -f -
+                                  kubectl apply -f k8s/cronjob.yaml
                                 fi
 
                                 # Rollout status
