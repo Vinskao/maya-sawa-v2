@@ -123,17 +123,35 @@ class ProgrammingKMSource(BaseKMSource):
             except Exception as _e:
                 logger.warning("自動補齊 embedding 失敗或已略過: %s", str(_e))
 
-            # 1) 先嘗試直接用資料庫的向量進行檢索
+            # 1) 先嘗試直接用資料庫的語義/全文進行檢索
             all_articles: List[Dict[str, Any]] = []
 
-            # 2) 優先使用向量相似度（若可計算查詢向量）
+            # 2) 優先使用向量相似度（若可計算查詢向量）與 trigram 全文檢索（pg_trgm）
             query_vec = self._compute_query_embedding_safe(query.query)
 
             # 3) 嘗試從資料庫檢索（過濾測試文章）
             if query_vec is not None:
-                db_articles = self._search_db_by_embedding(query_vec, k=5, threshold=0.0)
-                all_articles = self._filter_test_articles(db_articles)
-                logger.info(f"從資料庫檢索到 {len(db_articles)} 篇文章，過濾後剩 {len(all_articles)} 篇")
+                db_semantic = self._search_db_by_embedding(query_vec, k=8, threshold=0.0)
+            else:
+                db_semantic = []
+
+            db_trgm = self._search_db_by_trigram(query.query or "", k=12, min_sim=0.1)
+
+            # 合併候選（以 file_path 為 key 去重），並保留各自分數
+            merged: Dict[str, Dict[str, Any]] = {}
+            for art in db_semantic:
+                key = art.get('file_path') or f"id:{art.get('id')}"
+                merged[key] = {**art, 'emb_score': float(art.get('_match_score') or 0.0), 'text_score': 0.0}
+            for art in db_trgm:
+                key = art.get('file_path') or f"id:{art.get('id')}"
+                existing = merged.get(key, {**art, 'emb_score': 0.0})
+                existing.update(art)
+                existing['text_score'] = float(art.get('_text_score') or 0.0)
+                merged[key] = existing
+
+            merged_list = list(merged.values())
+            all_articles = self._filter_test_articles(merged_list)
+            logger.info(f"DB 候選文章：semantic={len(db_semantic)}，trigram={len(db_trgm)}，合併後={len(all_articles)}")
 
             # 如果資料庫沒有足夠的文章，回退到 Paprika API
             if len(all_articles) < 3:
@@ -163,7 +181,7 @@ class ProgrammingKMSource(BaseKMSource):
             query_terms = list({t for t in (alpha_num_terms + split_terms) if t})
 
             # 5) 構建相似度/關聯度分數
-            #    若有 query_vec，使用餘弦相似度；否則使用關鍵詞匹配分數
+            #    優先使用混合分數：text(0.6) + embedding(0.4)；若皆無則關鍵詞匹配回退
             scored: List[Tuple[Dict[str, Any], float]] = []
             for article in all_articles:
                 content_l = (article.get('content') or '').lower()
@@ -172,10 +190,11 @@ class ProgrammingKMSource(BaseKMSource):
                 sim_score: float = 0.0
                 matched_terms: List[str] = []
 
-                if query_vec is not None:
-                    art_vec = self._parse_embedding(article.get('embedding'))
-                    if art_vec is not None:
-                        sim_score = self._cosine_similarity(query_vec, art_vec)
+                # 先取混合分數（若存在）
+                text_score = float(article.get('text_score') or 0.0)
+                emb_score = float(article.get('emb_score') or 0.0)
+                if text_score > 0.0 or emb_score > 0.0:
+                    sim_score = 0.6 * text_score + 0.4 * emb_score
                 else:
                     # 關鍵詞匹配作為回退
                     term_score = 0
@@ -432,6 +451,67 @@ class ProgrammingKMSource(BaseKMSource):
                         })
         except Exception as e:
             logger.error("DB 向量檢索失敗: %s", str(e))
+            return []
+        return rows
+
+    def _search_db_by_trigram(self, query_text: str, k: int = 10, min_sim: float = 0.1) -> List[Dict[str, Any]]:
+        """用 pg_trgm 對 content 做全文近似檢索，利用 GIN(trgm) 索引。"""
+        if not query_text:
+            return []
+        conn_str = os.getenv('POSTGRES_CONNECTION_STRING') or os.getenv('DATABASE_URL')
+        if not conn_str:
+            db_host = os.getenv('DB_HOST')
+            db_port = os.getenv('DB_PORT')
+            db_name = os.getenv('DB_DATABASE')
+            db_user = os.getenv('DB_USERNAME')
+            db_pass = os.getenv('DB_PASSWORD')
+            db_sslmode = os.getenv('DB_SSLMODE')
+            if all([db_host, db_port, db_name, db_user, db_pass]):
+                conn_str = f"postgres://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+                if db_sslmode:
+                    conn_str = f"{conn_str}?sslmode={db_sslmode}"
+            else:
+                return []
+        rows: List[Dict[str, Any]] = []
+        try:
+            # 使用獨立的連線避免 transaction 衝突
+            with psycopg.connect(conn_str, autocommit=True) as conn:
+                with conn.cursor() as cur:
+                    # 設定本連線的 trigram 門檻，讓 % 運算子使用指定 min_sim
+                    try:
+                        cur.execute("SELECT set_limit(%s)", (float(min_sim),))
+                    except Exception:
+                        pass
+                    cur.execute(
+                        """
+                        SELECT
+                            id,
+                            file_path,
+                            content,
+                            file_date,
+                            similarity(content, %s) AS sim
+                        FROM articles
+                        WHERE content %% %s
+                        AND file_path NOT LIKE 'test/%%'
+                        AND file_path NOT LIKE '%%test%%'
+                        ORDER BY sim DESC
+                        LIMIT %s
+                        """,
+                        (query_text, query_text, k)
+                    )
+                    for r in cur.fetchall():
+                        sim_val = float(r[4] or 0.0)
+                        if sim_val < min_sim:
+                            continue
+                        rows.append({
+                            'id': r[0],
+                            'file_path': r[1],
+                            'content': r[2],
+                            'file_date': r[3].isoformat() if r[3] else None,
+                            '_text_score': sim_val,
+                        })
+        except Exception as e:
+            logger.error("DB trigram 檢索失敗: %s", str(e))
             return []
         return rows
 

@@ -12,6 +12,7 @@ from maya_sawa_v2.ai_processing.utils import AIProviderConfig, ModelNameMapper
 from maya_sawa_v2.ai_processing.tasks import process_ai_response_sync
 from maya_sawa_v2.ai_processing.km_sources.manager import KMSourceManager
 from .serializers import ConversationSerializer, MessageSerializer, CreateMessageSerializer, AIModelSerializer, AIProviderConfigSerializer
+from .services import ChatHistoryService
 from .permissions import AllowAnyPermission
 import uuid
 import logging
@@ -264,6 +265,18 @@ def ask_with_model(request):
                 content=question
             )
 
+        # 寫入 Redis 聊天歷史
+        try:
+            ch = ChatHistoryService()
+            ch.set_meta(session_id, {
+                'user_id': str(user.id),
+                'conversation_id': str(conversation.id),
+                'created_at': str(int(timezone.now().timestamp()))
+            })
+            ch.append_message(session_id, 'user', question)
+        except Exception as _:
+            pass
+
                 # 如果使用知識庫，先搜索相關知識
         knowledge_context = ""
         knowledge_citations = []
@@ -329,8 +342,15 @@ def ask_with_model(request):
                 if knowledge_context:
                     response = f"{response}\n\n{knowledge_context}"
 
+                # 寫入 Redis 聊天歷史（AI 回應）
+                try:
+                    ch = ChatHistoryService()
+                    ch.append_message(session_id, 'assistant', response, {'model': ai_model.name})
+                except Exception:
+                    pass
+
                 return Response({
-                    'session_id': f"qa-{uuid.uuid4().hex[:8]}",
+                    'session_id': session_id,
                     'conversation_id': str(conversation.id),
                     'question': question,
                     'ai_model': {
@@ -368,6 +388,41 @@ def ask_with_model(request):
         return Response({
             'error': f'服務器錯誤: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def chat_history(request, session_id: str):
+    """取得聊天歷史（Redis）。"""
+    try:
+        ch = ChatHistoryService()
+        data = {
+            'session_id': session_id,
+            'meta': ch.get_meta(session_id),
+            'messages': ch.get_history(session_id),
+        }
+        return Response(data)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET', 'OPTIONS'])
+@permission_classes([AllowAny])
+def legacy_chat_history(request, session_tail: str):
+    """相容舊路徑 /maya-sawa/qa/chat-history/{session_tail}。
+    新制 session_id 以 qa- 開頭，這裡若未帶 prefix，將自動補上。
+    """
+    try:
+        session_id = session_tail if session_tail.startswith('qa-') else f'qa-{session_tail}'
+        ch = ChatHistoryService()
+        data = {
+            'session_id': session_id,
+            'meta': ch.get_meta(session_id),
+            'messages': ch.get_history(session_id),
+        }
+        return Response(data)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])

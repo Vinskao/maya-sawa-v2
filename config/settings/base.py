@@ -20,7 +20,7 @@ if READ_DOT_ENV_FILE:
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#secret-key
 SECRET_KEY = env(
-    "DJANGO_SECRET_KEY",
+    "MAYA_V2_SECRET_KEY",
     default="10QUxyiQ3CHSlZpgtj5Y9pbBLLl7fcDTXtmrOKvsPp4KmJL6hVP68NZyhaadsNUN",
 )
 # https://docs.djangoproject.com/en/dev/ref/settings/#debug

@@ -7,6 +7,7 @@ from django.urls import path
 from django.views import defaults as default_views
 from django.views.generic import TemplateView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
+from django.http import JsonResponse
 
 urlpatterns = [
     path("", TemplateView.as_view(template_name="pages/home.html"), name="home"),
@@ -20,6 +21,7 @@ urlpatterns = [
     # User management
     path("users/", include("maya_sawa_v2.users.urls", namespace="users")),
     path("accounts/", include("allauth.urls")),
+    path("healthz", lambda request: JsonResponse({"status": "ok"})),
     # API
     path("", include("maya_sawa_v2.api.urls")),
     # API Documentation

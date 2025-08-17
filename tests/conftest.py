@@ -40,7 +40,7 @@ def temp_env_file():
     env_content = """
 # Django Settings
 DJANGO_DEBUG=True
-DJANGO_SECRET_KEY=test-secret-key
+MAYA_V2_SECRET_KEY=test-secret-key
 
 # Database
 DATABASE_URL=sqlite:///test.db

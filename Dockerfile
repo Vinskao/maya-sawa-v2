@@ -1,0 +1,38 @@
+FROM python:3.12-slim AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    POETRY_VIRTUALENVS_CREATE=false \
+    POETRY_NO_INTERACTION=1 \
+    PIP_NO_CACHE_DIR=1
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential curl libpq5 libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Poetry
+RUN curl -sSL https://install.python-poetry.org | python - && \
+    ln -s /root/.local/bin/poetry /usr/local/bin/poetry
+
+# Copy only pyproject to leverage Docker layer cache
+COPY pyproject.toml poetry.lock* /app/
+
+RUN poetry install --no-root --only main
+
+# Copy project
+COPY . /app
+
+EXPOSE 8000
+
+# Default env (override in k8s)
+ENV DJANGO_SETTINGS_MODULE=config.settings.production \
+    PORT=8000 \
+    GUNICORN_CMD_ARGS="--workers=3 --threads=4 --bind=0.0.0.0:8000 --timeout 120"
+
+# Entrypoint script
+CMD ["bash", "-lc", "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn config.wsgi:application"]
+
+
+

@@ -49,7 +49,7 @@ class TestToggleAPISecurityCommand:
         self.create_env_file("""
 # Django Settings
 DJANGO_DEBUG=True
-DJANGO_SECRET_KEY=test-key
+MAYA_V2_SECRET_KEY=test-key
 
 # API Security
 API_REQUIRE_AUTHENTICATION=False
@@ -74,7 +74,7 @@ API_RATE_LIMIT_ENABLED=False
         initial_content = """
 # Django Settings
 DJANGO_DEBUG=True
-DJANGO_SECRET_KEY=test-key
+MAYA_V2_SECRET_KEY=test-key
 
 # API Security
 API_REQUIRE_AUTHENTICATION=False
@@ -105,7 +105,7 @@ API_RATE_LIMIT_ENABLED=False
         initial_content = """
 # Django Settings
 DJANGO_DEBUG=True
-DJANGO_SECRET_KEY=test-key
+MAYA_V2_SECRET_KEY=test-key
 
 # API Security
 API_REQUIRE_AUTHENTICATION=True
@@ -135,7 +135,7 @@ API_RATE_LIMIT_ENABLED=True
         self.create_env_file("""
 # Django Settings
 DJANGO_DEBUG=True
-DJANGO_SECRET_KEY=test-key
+MAYA_V2_SECRET_KEY=test-key
         """.strip())
 
         # 模擬當前工作目錄
@@ -166,7 +166,7 @@ DJANGO_SECRET_KEY=test-key
         initial_content = """
 # Django Settings
 DJANGO_DEBUG=True
-DJANGO_SECRET_KEY=test-key
+MAYA_V2_SECRET_KEY=test-key
 
 # Database
 DATABASE_URL=postgresql://user:pass@localhost/db
@@ -224,7 +224,7 @@ API_RATE_LIMIT_ENABLED=False
         self.create_env_file("""
 # Django Settings
 DJANGO_DEBUG=True
-DJANGO_SECRET_KEY=test-key
+MAYA_V2_SECRET_KEY=test-key
         """.strip())
 
         # 模擬當前工作目錄
