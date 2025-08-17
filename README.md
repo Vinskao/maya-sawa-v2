@@ -94,6 +94,62 @@ sequenceDiagram
     Note over F,R: 可用 GET /maya-v2/qa/chat-history/{session_id}
 ```
 
+## 全文檢索混和 Embedding 架構圖
+
+```mermaid
+graph TD
+  %% 使用者與入口
+  U["User"] --> Q["ask-with-model API<br/>question"]
+  Q --> P["Full-text Retrieval Pipeline"]
+
+  %% 檢索流程
+  subgraph "Pipeline"
+    P --> N["Normalize/Lowercase<br/>trim punctuation"]
+    N --> E{"Compute Embedding?"}
+    E -- Yes --> EM["OpenAI Embeddings<br/>(text-embedding-3-small) → qvec(1536)"]
+    E -- No --> SKIP["Skip vector branch"]
+
+    %% Postgres 檢索（Trigram 與 Vector）
+    subgraph "PostgreSQL"
+      direction LR
+      PG1["Trigram Search<br/>content % :query<br/>similarity(content, :query) as text_sim"]:::trgm
+      PG2["Vector Search<br/>1 - (embedding <=> :qvec) as vec_sim"]:::vec
+      IDX1["GIN Index<br/>idx_articles_content_trgm<br/>(content gin_trgm_ops)"]:::idx
+      IDX2["IVFFlat Index<br/>idx_articles_embedding_ivfcos<br/>(embedding vector_cosine_ops)"]:::idx
+      EXT1["EXTENSION pg_trgm<br/>set_limit(:min_sim)"]:::ext
+      EXT2["EXTENSION pgvector"]:::ext
+    end
+
+    EM --> PG2
+    SKIP -.-> PG1
+    N --> PG1
+    PG1 --> MRG["Merge & Rank<br/>score = 0.6*text_sim + 0.4*vec_sim"]
+    PG2 --> MRG
+    MRG --> TOPK["Top-K Articles"]
+  end
+
+  %% 後處理與回傳
+  TOPK --> CTX["Build Context from Articles<br/>(title + snippet)"]
+  CTX --> AI["LLM Call (OpenAI/Gemini/Qwen)"]
+  AI --> RESP["Answer + Citations"]
+  RESP --> RDS["Redis ChatHistory<br/>chat:session:{sid}"]
+  RESP --> OUT["API Response"]
+
+  %% 資料表與索引
+  subgraph "articles schema"
+    TBL["articles<br/>- id BIGSERIAL PK<br/>- file_path VARCHAR(500) UNIQUE<br/>- content TEXT NOT NULL<br/>- file_date TIMESTAMP NOT NULL<br/>- embedding vector(1536)"]:::tbl
+  end
+  TBL -. indexed by .-> IDX1
+  TBL -. indexed by .-> IDX2
+
+  %% 樣式
+  classDef trgm fill:#e3f2fd,stroke:#1e88e5,stroke-width:1px
+  classDef vec fill:#fce4ec,stroke:#d81b60,stroke-width:1px
+  classDef idx fill:#fff3e0,stroke:#fb8c00,stroke-width:1px
+  classDef ext fill:#ede7f6,stroke:#5e35b1,stroke-width:1px
+  classDef tbl fill:#f1f8e9,stroke:#43a047,stroke-width:1px
+```
+
 <!-- 移除 ER 與安全圖以符合現況精簡需求 -->
 
 ## 快速開始
