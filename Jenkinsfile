@@ -122,7 +122,9 @@ pipeline {
                         string(credentialsId: 'REDIS_CUSTOM_PORT', variable: 'REDIS_CUSTOM_PORT'),
                         string(credentialsId: 'REDIS_PASSWORD', variable: 'REDIS_PASSWORD'),
                         string(credentialsId: 'REDIS_QUEUE_MAYA', variable: 'REDIS_QUEUE_MAYA'),
-                        string(credentialsId: 'PUBLIC_API_BASE_URL', variable: 'PUBLIC_API_BASE_URL')
+                        string(credentialsId: 'PUBLIC_API_BASE_URL', variable: 'PUBLIC_API_BASE_URL'),
+                        string(credentialsId: 'DJANGO_ADMIN_URL', variable: 'DJANGO_ADMIN_URL'),
+                        string(credentialsId: 'MAYA_V2_ADMIN_URL', variable: 'MAYA_V2_ADMIN_URL')
                     ]) {
                         withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
                             sh '''
@@ -150,6 +152,8 @@ pipeline {
                                 CELERY_BROKER_URL="$REDIS_URL"
                                 CELERY_RESULT_BACKEND="$REDIS_URL"
                                 REDIS_QUEUE_MAYA_V2="${REDIS_QUEUE_MAYA:-maya_v2}"
+                                # Map MAYA_V2_ADMIN_URL to the framework's DJANGO_ADMIN_URL key
+                                DJANGO_ADMIN_URL="${DJANGO_ADMIN_URL:-${MAYA_V2_ADMIN_URL:-admin/}}"
 
                                 # Create/update django-secrets (OpenAI keys and Django secret)
                                 kubectl create secret generic django-secrets \
@@ -166,6 +170,7 @@ pipeline {
                                   --from-literal=CELERY_BROKER_URL="$CELERY_BROKER_URL" \
                                   --from-literal=CELERY_RESULT_BACKEND="$CELERY_RESULT_BACKEND" \
                                   --from-literal=REDIS_QUEUE_MAYA_V2="$REDIS_QUEUE_MAYA_V2" \
+                                  --from-literal=DJANGO_ADMIN_URL="$DJANGO_ADMIN_URL" \
                                   -n default \
                                   --dry-run=client -o yaml | kubectl apply -f -
 

@@ -33,6 +33,11 @@ spec:
           env:
             - name: DJANGO_SETTINGS_MODULE
               value: config.settings.production
+            - name: DJANGO_ADMIN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: DJANGO_ADMIN_URL
             - name: MAYA_V2_SECRET_KEY
               valueFrom:
                 secretKeyRef:
@@ -94,6 +99,11 @@ spec:
           env:
             - name: DJANGO_SETTINGS_MODULE
               value: config.settings.production
+            - name: DJANGO_ADMIN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: DJANGO_ADMIN_URL
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
