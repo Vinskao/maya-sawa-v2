@@ -116,6 +116,13 @@ class ProgrammingKMSource(BaseKMSource):
         results: List[KMResult] = []
 
         try:
+            # 0) 若資料庫存在缺少 embedding 的文章，先嘗試自動補齊（僅處理 content 不為空者）
+            try:
+                self._backfill_missing_embeddings(limit=int(os.getenv('EMBED_BACKFILL_LIMIT', '200')),
+                                                  batch_size=int(os.getenv('EMBED_BACKFILL_BATCH', '50')))
+            except Exception as _e:
+                logger.warning("自動補齊 embedding 失敗或已略過: %s", str(_e))
+
             # 1) 先嘗試直接用資料庫的向量進行檢索
             all_articles: List[Dict[str, Any]] = []
 
@@ -235,6 +242,95 @@ class ProgrammingKMSource(BaseKMSource):
         return results
 
     # ========== Embedding helpers ==========
+    def _backfill_missing_embeddings(self, limit: int = 200, batch_size: int = 50) -> None:
+        """為 articles 表補齊缺少的 embedding。若無需要則不動作。
+
+        僅處理 content 不為空且 embedding 為 NULL 的文章；若沒有 OpenAI 金鑰或資料庫連線則略過。
+        """
+        conn_str = os.getenv('POSTGRES_CONNECTION_STRING') or os.getenv('DATABASE_URL')
+        if not conn_str:
+            # 試著組裝拆分環境變數
+            db_host = os.getenv('DB_HOST')
+            db_port = os.getenv('DB_PORT')
+            db_name = os.getenv('DB_DATABASE')
+            db_user = os.getenv('DB_USERNAME')
+            db_pass = os.getenv('DB_PASSWORD')
+            db_sslmode = os.getenv('DB_SSLMODE')
+            if all([db_host, db_port, db_name, db_user, db_pass]):
+                conn_str = f"postgres://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+                if db_sslmode:
+                    conn_str = f"{conn_str}?sslmode={db_sslmode}"
+        if not conn_str:
+            return  # 無法連線資料庫則略過
+
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            return  # 沒有金鑰則略過
+
+        try:
+            import psycopg
+        except Exception:
+            return
+        try:
+            from openai import OpenAI
+        except Exception:
+            return
+
+        # 抓取需要補齊的文章
+        rows: List[Tuple[Any, Any, Any]] = []
+        with psycopg.connect(conn_str) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, file_path, content
+                    FROM articles
+                    WHERE embedding IS NULL
+                      AND content IS NOT NULL AND length(content) > 0
+                    ORDER BY file_date DESC
+                    LIMIT %s
+                    """,
+                    (limit,)
+                )
+                rows = cur.fetchall()
+
+        if not rows:
+            return  # 無待處理
+
+        client = OpenAI(api_key=api_key)
+
+        processed = 0
+        with psycopg.connect(conn_str) as conn:
+            with conn.cursor() as cur:
+                for i in range(0, len(rows), batch_size):
+                    batch = rows[i:i + batch_size]
+                    inputs = [r[2] for r in batch if r[2]]
+                    if not inputs:
+                        continue
+                    try:
+                        resp = client.embeddings.create(model=os.getenv('OPENAI_EMBEDDING_MODEL', 'text-embedding-3-small'),
+                                                        input=inputs)
+                    except Exception as e:
+                        logger.warning("產生 embedding 失敗，停止自動補齊: %s", str(e))
+                        return
+
+                    # 寫回資料庫
+                    idx = 0
+                    for row in batch:
+                        art_id = row[0]
+                        content_val = row[2]
+                        if not content_val:
+                            continue
+                        vec = resp.data[idx].embedding
+                        idx += 1
+                        emb_str = '[' + ','.join(map(str, vec)) + ']'
+                        cur.execute(
+                            "UPDATE articles SET embedding = %s::vector, updated_at = NOW() WHERE id = %s",
+                            (emb_str, art_id)
+                        )
+                        processed += 1
+                    conn.commit()
+        logger.info("自動補齊 embedding 完成，共更新 %d 筆", processed)
+
     def _compute_query_embedding_safe(self, text: str) -> Optional[List[float]]:
         """嘗試用 OpenAI 產生查詢向量，失敗則回傳 None。"""
         try:
@@ -290,7 +386,19 @@ class ProgrammingKMSource(BaseKMSource):
         """用 PostgreSQL pgvector 做語義檢索。"""
         conn_str = os.getenv('POSTGRES_CONNECTION_STRING') or os.getenv('DATABASE_URL')
         if not conn_str:
-            return []
+            # 允許以拆分的 DB_* 變數組裝連線字串
+            db_host = os.getenv('DB_HOST')
+            db_port = os.getenv('DB_PORT')
+            db_name = os.getenv('DB_DATABASE')
+            db_user = os.getenv('DB_USERNAME')
+            db_pass = os.getenv('DB_PASSWORD')
+            db_sslmode = os.getenv('DB_SSLMODE')
+            if all([db_host, db_port, db_name, db_user, db_pass]):
+                conn_str = f"postgres://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+                if db_sslmode:
+                    conn_str = f"{conn_str}?sslmode={db_sslmode}"
+            else:
+                return []
         embedding_str = '[' + ','.join(map(str, query_vec)) + ']'
         rows: List[Dict[str, Any]] = []
         try:

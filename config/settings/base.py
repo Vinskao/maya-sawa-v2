@@ -52,9 +52,42 @@ LOCALE_PATHS = [str(BASE_DIR / "locale")]
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#databases
 
-DATABASES = {
-    "default": env.db("DATABASE_URL"),
-}
+_db_url = env("DATABASE_URL", default=None)
+if _db_url:
+    DATABASES = {
+        "default": env.db("DATABASE_URL"),
+    }
+else:
+    # Allow configuring DB via split variables (DB_*) when DATABASE_URL is not provided
+    _engine_map = {
+        "postgres": "django.db.backends.postgresql",
+        "postgresql": "django.db.backends.postgresql",
+        "pgsql": "django.db.backends.postgresql",
+        "mysql": "django.db.backends.mysql",
+        "sqlite": "django.db.backends.sqlite3",
+    }
+    _conn = env("DB_CONNECTION", default="pgsql").lower()
+    _engine = _engine_map.get(_conn, "django.db.backends.postgresql")
+
+    # Default DB name for sqlite, otherwise use env value
+    _default_name = str(BASE_DIR / "db.sqlite3") if _engine == "django.db.backends.sqlite3" else ""
+
+    DATABASES = {
+        "default": {
+            "ENGINE": _engine,
+            "NAME": env("DB_DATABASE", default=_default_name),
+            "USER": env("DB_USERNAME", default=""),
+            "PASSWORD": env("DB_PASSWORD", default=""),
+            "HOST": env("DB_HOST", default=""),
+            "PORT": env("DB_PORT", default=""),
+        }
+    }
+
+    # Optional SSL mode for Postgres
+    _sslmode = env("DB_SSLMODE", default=None)
+    if _sslmode and _engine == "django.db.backends.postgresql":
+        DATABASES["default"].setdefault("OPTIONS", {})["sslmode"] = _sslmode
+
 DATABASES["default"]["ATOMIC_REQUESTS"] = True
 # https://docs.djangoproject.com/en/stable/ref/settings/#std:setting-DEFAULT_AUTO_FIELD
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
