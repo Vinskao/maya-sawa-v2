@@ -91,7 +91,7 @@ sequenceDiagram
     A->>DB: 建立 AI Message
     A-->>F: 回傳 AI 回應 + 引用
 
-    Note over F,R: 可用 GET /maya-v2/qa/chat-history/{session_id}
+    Note over F,R: 可用 GET /maya-sawa/qa/chat-history/{session_id}
 ```
 
 ## 全文檢索混和 Embedding 架構圖
