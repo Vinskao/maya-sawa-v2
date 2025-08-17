@@ -123,7 +123,6 @@ pipeline {
                         string(credentialsId: 'REDIS_PASSWORD', variable: 'REDIS_PASSWORD'),
                         string(credentialsId: 'REDIS_QUEUE_MAYA', variable: 'REDIS_QUEUE_MAYA'),
                         string(credentialsId: 'PUBLIC_API_BASE_URL', variable: 'PUBLIC_API_BASE_URL'),
-                        string(credentialsId: 'DJANGO_ADMIN_URL', variable: 'DJANGO_ADMIN_URL'),
                         string(credentialsId: 'MAYA_V2_ADMIN_URL', variable: 'MAYA_V2_ADMIN_URL')
                     ]) {
                         withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
