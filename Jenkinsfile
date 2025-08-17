@@ -142,13 +142,32 @@ pipeline {
                                 test -f k8s/deployment.yaml || { echo "k8s/deployment.yaml missing"; exit 1; }
                                 test -f k8s/cronjob.yaml || echo "k8s/cronjob.yaml not found, skipping cronjobs"
 
-                                echo "Applying manifests ..."
-                                # Export variables used by the templates
-                                export DATABASE_URL="postgres://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_DATABASE}?sslmode=require"
-                                export REDIS_URL="redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_CUSTOM_PORT}/0"
-                                export CELERY_BROKER_URL="$REDIS_URL"
-                                export CELERY_RESULT_BACKEND="$REDIS_URL"
-                                export REDIS_QUEUE_MAYA_V2="${REDIS_QUEUE_MAYA:-maya_v2}"
+                                echo "Creating/updating secrets and applying manifests ..."
+
+                                # Construct app-config values
+                                DATABASE_URL="postgres://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_DATABASE}?sslmode=require"
+                                REDIS_URL="redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_CUSTOM_PORT}/0"
+                                CELERY_BROKER_URL="$REDIS_URL"
+                                CELERY_RESULT_BACKEND="$REDIS_URL"
+                                REDIS_QUEUE_MAYA_V2="${REDIS_QUEUE_MAYA:-maya_v2}"
+
+                                # Create/update django-secrets (OpenAI keys and Django secret)
+                                kubectl create secret generic django-secrets \
+                                  --from-literal=MAYA_V2_SECRET_KEY="${MAYA_V2_SECRET_KEY}" \
+                                  --from-literal=OPENAI_API_KEY="${OPENAI_API_KEY}" \
+                                  --from-literal=OPENAI_ORGANIZATION="${OPENAI_ORGANIZATION}" \
+                                  -n default \
+                                  --dry-run=client -o yaml | kubectl apply -f -
+
+                                # Create/update app-config secret for runtime configuration
+                                kubectl create secret generic app-config \
+                                  --from-literal=DATABASE_URL="$DATABASE_URL" \
+                                  --from-literal=REDIS_URL="$REDIS_URL" \
+                                  --from-literal=CELERY_BROKER_URL="$CELERY_BROKER_URL" \
+                                  --from-literal=CELERY_RESULT_BACKEND="$CELERY_RESULT_BACKEND" \
+                                  --from-literal=REDIS_QUEUE_MAYA_V2="$REDIS_QUEUE_MAYA_V2" \
+                                  -n default \
+                                  --dry-run=client -o yaml | kubectl apply -f -
 
                                 # Apply Deployment/Service/Worker
                                 kubectl apply -f k8s/deployment.yaml

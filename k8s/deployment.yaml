@@ -39,13 +39,25 @@ spec:
                   name: django-secrets
                   key: MAYA_V2_SECRET_KEY
             - name: DATABASE_URL
-              value: ${DATABASE_URL}
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: DATABASE_URL
             - name: REDIS_URL
-              value: ${REDIS_URL}
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: REDIS_URL
             - name: CELERY_BROKER_URL
-              value: ${CELERY_BROKER_URL}
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: CELERY_BROKER_URL
             - name: CELERY_RESULT_BACKEND
-              value: ${CELERY_RESULT_BACKEND}
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: CELERY_RESULT_BACKEND
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -83,13 +95,30 @@ spec:
             - name: DJANGO_SETTINGS_MODULE
               value: config.settings.production
             - name: DATABASE_URL
-              value: ${DATABASE_URL}
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: DATABASE_URL
             - name: REDIS_URL
-              value: ${REDIS_URL}
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: REDIS_URL
             - name: CELERY_BROKER_URL
-              value: ${CELERY_BROKER_URL}
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: CELERY_BROKER_URL
             - name: CELERY_RESULT_BACKEND
-              value: ${CELERY_RESULT_BACKEND}
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: CELERY_RESULT_BACKEND
+            - name: REDIS_QUEUE_MAYA_V2
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: REDIS_QUEUE_MAYA_V2
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
