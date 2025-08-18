@@ -141,7 +141,6 @@ pipeline {
                                   --dry-run=client -o yaml | kubectl apply -f -
 
                                 test -f k8s/deployment.yaml || { echo "k8s/deployment.yaml missing"; exit 1; }
-                                test -f k8s/ingress.yaml || echo "k8s/ingress.yaml not found, skipping ingress"
                                 test -f k8s/cronjob.yaml || echo "k8s/cronjob.yaml not found, skipping cronjobs"
 
                                 echo "Creating/updating secrets and applying manifests ..."
@@ -186,10 +185,7 @@ pipeline {
                                   kubectl apply -f k8s/cronjob.yaml
                                 fi
 
-                                # Optionally apply Ingress if present
-                                if [ -f k8s/ingress.yaml ]; then
-                                  kubectl apply -f k8s/ingress.yaml
-                                fi
+                                # Ingress is embedded in k8s/deployment.yaml; no separate apply needed
 
                                 # Pin deployment to this build's immutable image tag
                                 kubectl set image deployment/maya-sawa-v2 \
