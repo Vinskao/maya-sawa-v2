@@ -21,7 +21,6 @@ spec:
         - name: migrate
           image: papakao/maya-sawa-v2:latest
           imagePullPolicy: Always
-          envFrom: []
           env:
             - name: DJANGO_SETTINGS_MODULE
               value: config.settings.production
@@ -35,6 +34,11 @@ spec:
                 secretKeyRef:
                   name: django-secrets
                   key: MAYA_V2_SECRET_KEY
+            - name: DJANGO_ADMIN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: DJANGO_ADMIN_URL
           command: ["bash", "-lc", "python manage.py migrate --noinput"]
         - name: collectstatic
           image: papakao/maya-sawa-v2:latest
@@ -47,6 +51,11 @@ spec:
                 secretKeyRef:
                   name: django-secrets
                   key: MAYA_V2_SECRET_KEY
+            - name: DJANGO_ADMIN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: DJANGO_ADMIN_URL
           command: ["bash", "-lc", "python manage.py collectstatic --noinput"]
       imagePullSecrets:
         - name: dockerhub-credentials
