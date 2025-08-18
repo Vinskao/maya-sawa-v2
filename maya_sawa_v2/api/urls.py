@@ -23,7 +23,7 @@ urlpatterns = [
     path('maya-v2/available-models/', available_models, name='available_models'),
     path('maya-v2/add-model/', add_model, name='add_model'),
     # Chat history endpoints (v1 primary)
-    path('maya-sawa/qa/chat-history/<str:session_id>', legacy_chat_history, name='chat_history'),
+    path('maya-sawa/qa/chat-history/<str:session_tail>', legacy_chat_history, name='chat_history'),
     # Backward compatibility: v2 style
     path('maya-v2/qa/chat-history/<str:session_id>', chat_history, name='chat_history_v2'),
 ]
