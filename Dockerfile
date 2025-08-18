@@ -19,7 +19,7 @@ RUN curl -sSL https://install.python-poetry.org | python - && \
 # Copy only pyproject to leverage Docker layer cache
 COPY pyproject.toml poetry.lock* /app/
 
-RUN poetry install --no-root --only main --with prod
+RUN poetry install --no-root --with prod --without dev
 
 # Copy project
 COPY . /app
