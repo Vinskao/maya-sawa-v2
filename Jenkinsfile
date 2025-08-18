@@ -181,6 +181,11 @@ pipeline {
                                   kubectl apply -f k8s/cronjob.yaml
                                 fi
 
+                                # Pin deployment to this build's immutable image tag
+                                kubectl set image deployment/maya-sawa-v2 \
+                                  web=${DOCKER_IMAGE}:${DOCKER_TAG} \
+                                  worker=${DOCKER_IMAGE}:${DOCKER_TAG} -n default
+
                                 # Rollout status
                                 kubectl rollout status deployment/maya-sawa-v2 -n default
                             '''
