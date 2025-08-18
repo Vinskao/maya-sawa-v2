@@ -90,7 +90,7 @@ spec:
         - name: worker
           image: papakao/maya-sawa-v2:latest
           imagePullPolicy: Always
-          command: ["bash", "-lc", "celery -A config worker -l info -Q ${REDIS_QUEUE_MAYA_V2:-maya_v2}"]
+          command: ["bash", "-lc", "celery -A config worker -l info -Q maya_v2"]
           resources:
             requests:
               cpu: 25m
