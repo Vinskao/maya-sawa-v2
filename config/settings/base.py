@@ -433,7 +433,7 @@ if _CORS_AVAILABLE:
     CORS_ALLOW_HEADERS = [
         "accept",
         "accept-encoding",
-        "authorization", 
+        "authorization",
         "content-type",
         "dnt",
         "origin",

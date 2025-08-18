@@ -182,6 +182,8 @@ poetry run celery -A config worker -l info -Q maya_v2
 ### 獲取可用模型列表
 ```bash
 curl -X GET "http://127.0.0.1:8000/maya-v2/available-models/"
+
+curl -X GET "https://peoplesystem.tatdvsonorth.com/maya-v2/available-models/"
 ```
 
 ### 使用指定模型進行對話

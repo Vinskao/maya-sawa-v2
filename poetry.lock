@@ -1012,6 +1012,22 @@ postal = ["cryptography ; python_version >= \"3.9\""]
 resend = ["svix"]
 
 [[package]]
+name = "django-cors-headers"
+version = "4.6.0"
+description = "django-cors-headers is a Django application for handling the server headers required for Cross-Origin Resource Sharing (CORS)."
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "django_cors_headers-4.6.0-py3-none-any.whl", hash = "sha256:8edbc0497e611c24d5150e0055d3b178c6534b8ed826fb6f53b21c63f5d48ba3"},
+    {file = "django_cors_headers-4.6.0.tar.gz", hash = "sha256:14d76b4b4c8d39375baeddd89e4f08899051eeaf177cb02a29bd6eae8cf63aa8"},
+]
+
+[package.dependencies]
+asgiref = ">=3.6"
+django = ">=4.2"
+
+[[package]]
 name = "django-coverage-plugin"
 version = "3.1.1"
 description = "Django template coverage.py plugin"
@@ -4704,4 +4720,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "449de055c119f186a03658c8dbecb4cdf15bc4ff93f7ea57c5378f729d0575dd"
+content-hash = "49dbe47f176342212de10ae482aa94324e8b9cc2dab1a0d41043aab77d10c1b4"
