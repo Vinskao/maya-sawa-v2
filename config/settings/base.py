@@ -121,8 +121,15 @@ THIRD_PARTY_APPS = [
     "allauth.socialaccount",
     "rest_framework",
     "drf_spectacular",
-    "corsheaders",
 ]
+
+# Conditionally add CORS headers (only if django-cors-headers is available)
+try:
+    import corsheaders
+    THIRD_PARTY_APPS.append("corsheaders")
+    _CORS_AVAILABLE = True
+except ImportError:
+    _CORS_AVAILABLE = False
 
 LOCAL_APPS = [
     "maya_sawa_v2.users",
@@ -178,7 +185,6 @@ AUTH_PASSWORD_VALIDATORS = [
 # https://docs.djangoproject.com/en/dev/ref/settings/#middleware
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
@@ -189,6 +195,10 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "allauth.account.middleware.AccountMiddleware",
 ]
+
+# Add CORS middleware only if available
+if _CORS_AVAILABLE:
+    MIDDLEWARE.insert(1, "corsheaders.middleware.CorsMiddleware")
 
 # STATIC
 # ------------------------------------------------------------------------------
@@ -404,29 +414,30 @@ if API_RATE_LIMIT_ENABLED:
         'anon': f"{_anon_per_minute}/min",
     }
 
-# CORS
+# CORS (only if django-cors-headers is available)
 # ------------------------------------------------------------------------------
-# https://github.com/adamchainz/django-cors-headers
-CORS_ALLOWED_ORIGINS = env.list(
-    "CORS_ALLOWED_ORIGINS",
-    default=[
-        "http://localhost:4321",  # Astro dev server
-        "http://127.0.0.1:4321",  # Alternative localhost
+if _CORS_AVAILABLE:
+    # https://github.com/adamchainz/django-cors-headers
+    CORS_ALLOWED_ORIGINS = env.list(
+        "CORS_ALLOWED_ORIGINS",
+        default=[
+            "http://localhost:4321",  # Astro dev server
+            "http://127.0.0.1:4321",  # Alternative localhost
+        ]
+    )
+
+    # Allow credentials for authenticated requests
+    CORS_ALLOW_CREDENTIALS = True
+
+    # Allow common headers
+    CORS_ALLOW_HEADERS = [
+        "accept",
+        "accept-encoding",
+        "authorization", 
+        "content-type",
+        "dnt",
+        "origin",
+        "user-agent",
+        "x-csrftoken",
+        "x-requested-with",
     ]
-)
-
-# Allow credentials for authenticated requests
-CORS_ALLOW_CREDENTIALS = True
-
-# Allow common headers
-CORS_ALLOW_HEADERS = [
-    "accept",
-    "accept-encoding",
-    "authorization", 
-    "content-type",
-    "dnt",
-    "origin",
-    "user-agent",
-    "x-csrftoken",
-    "x-requested-with",
-]
