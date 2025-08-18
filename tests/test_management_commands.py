@@ -28,7 +28,7 @@ class TestToggleAPISecurityCommand:
             shutil.rmtree(self.temp_dir)
 
     def create_env_file(self, content):
-        """創建測試用的 .env 文件"""
+        """建立測試用的 .env 文件"""
         with open(self.env_file_path, 'w', encoding='utf-8') as f:
             f.write(content)
 
@@ -45,7 +45,7 @@ class TestToggleAPISecurityCommand:
         mock_settings.API_REQUIRE_CSRF = True
         mock_settings.API_RATE_LIMIT_ENABLED = False
 
-        # 創建測試 .env 文件
+        # 建立測試 .env 文件
         self.create_env_file("""
 # Django Settings
 DJANGO_DEBUG=True
@@ -63,14 +63,14 @@ API_RATE_LIMIT_ENABLED=False
                 call_command('toggle_api_security', '--status')
 
                 output = mock_stdout.getvalue()
-                assert '📊 当前API安全设置状态' in output
-                assert '🔐 认证要求: ❌ 禁用' in output
-                assert '🛡️  CSRF保护: ✅ 启用' in output
+                assert '📊 當前API安全設置狀態' in output
+                assert '🔐 認證要求: ❌ 禁用' in output
+                assert '🛡️  CSRF保護: ✅ 啟用' in output
                 assert '⚡ 速率限制: ❌ 禁用' in output
 
     def test_enable_security_command(self):
         """測試啟用安全設置命令"""
-        # 創建初始 .env 文件
+        # 建立初始 .env 文件
         initial_content = """
 # Django Settings
 DJANGO_DEBUG=True
@@ -91,7 +91,7 @@ API_RATE_LIMIT_ENABLED=False
 
                 output = mock_stdout.getvalue()
                 # 接受已啟用或狀態輸出（本地化可能略有不同）
-                assert ('已启用' in output) or ('已開啟' in output) or ('API安全设置已' in output)
+                assert ('已啟用' in output) or ('已開啟' in output) or ('API安全設置已' in output)
 
                 # 檢查 .env 文件是否被更新
                 updated_content = self.read_env_file()
@@ -101,7 +101,7 @@ API_RATE_LIMIT_ENABLED=False
 
     def test_disable_security_command(self):
         """測試禁用安全設置命令"""
-        # 創建初始 .env 文件
+        # 建立初始 .env 文件
         initial_content = """
 # Django Settings
 DJANGO_DEBUG=True
@@ -121,7 +121,7 @@ API_RATE_LIMIT_ENABLED=True
                 call_command('toggle_api_security', '--disable')
 
                 output = mock_stdout.getvalue()
-                assert ('已禁用' in output) or ('已關閉' in output) or ('API安全设置已' in output)
+                assert ('已禁用' in output) or ('已關閉' in output) or ('API安全設置已' in output)
 
                 # 檢查 .env 文件是否被更新
                 updated_content = self.read_env_file()
@@ -131,7 +131,7 @@ API_RATE_LIMIT_ENABLED=True
 
     def test_command_without_arguments(self):
         """測試沒有參數的命令"""
-        # 創建測試 .env 文件
+        # 建立測試 .env 文件
         self.create_env_file("""
 # Django Settings
 DJANGO_DEBUG=True
@@ -144,7 +144,7 @@ MAYA_V2_SECRET_KEY=test-key
                 call_command('toggle_api_security')
 
                 output = mock_stdout.getvalue()
-                assert '请指定 --enable 或 --disable 参数' in output
+                assert '請指定 --enable 或 --disable 參數' in output
 
     def test_command_with_missing_env_file(self):
         """測試 .env 文件不存在的情況"""
@@ -162,7 +162,7 @@ MAYA_V2_SECRET_KEY=test-key
 
     def test_command_preserves_existing_content(self):
         """測試命令保留現有內容"""
-        # 創建包含其他設置的 .env 文件
+        # 建立包含其他設置的 .env 文件
         initial_content = """
 # Django Settings
 DJANGO_DEBUG=True
@@ -194,7 +194,7 @@ REDIS_URL=redis://localhost:6379
 
     def test_command_handles_comments_and_whitespace(self):
         """測試命令處理註釋和空白"""
-        # 創建包含註釋和空白的 .env 文件
+        # 建立包含註釋和空白的 .env 文件
         initial_content = """
 # Django Settings
 DJANGO_DEBUG=True
@@ -220,7 +220,7 @@ API_RATE_LIMIT_ENABLED=False
 
     def test_command_with_multiple_arguments(self):
         """測試多個參數的命令"""
-        # 創建測試 .env 文件
+        # 建立測試 .env 文件
         self.create_env_file("""
 # Django Settings
 DJANGO_DEBUG=True
@@ -234,7 +234,7 @@ MAYA_V2_SECRET_KEY=test-key
                 call_command('toggle_api_security', '--status')
 
                 output = mock_stdout.getvalue()
-                assert ('当前API安全设置状态' in output) or ('API安全' in output)
+                assert ('當前API安全設置狀態' in output) or ('API安全' in output)
 
 
 class TestSetupAIModelsCommand:
@@ -294,9 +294,9 @@ class TestSetupAIModelsCommand:
     @patch('maya_sawa_v2.ai_processing.management.commands.setup_ai_models.AIModel')
     def test_setup_ai_models_with_errors(self, mock_aimodel):
         """測試設置 AI 模型時出現錯誤"""
-        # 模擬創建時出現錯誤
+        # 模擬建立時出現錯誤
         mock_aimodel.objects.get_or_create.side_effect = Exception("Database error")
-        # 設置環境以進入創建流程
+        # 設置環境以進入建立流程
         with patch.dict('os.environ', {
             'ENABLED_PROVIDERS': 'openai',
             'OPENAI_MODELS': 'gpt-4o-mini',

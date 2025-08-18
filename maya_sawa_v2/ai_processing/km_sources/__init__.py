@@ -1,5 +1,5 @@
 """
-知识库源模块
+知識庫源模組
 """
 
 from .base import KMQuery, KMResult, BaseKMSource

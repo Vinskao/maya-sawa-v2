@@ -19,13 +19,13 @@ class ConversationSerializer(serializers.ModelSerializer):
         fields = ['id', 'session_id', 'conversation_type', 'status', 'title', 'messages', 'created_at', 'updated_at']
 
     def create(self, validated_data):
-        """创建对话 - 根据认证状态设置用户"""
+        """建立對話 - 根據認證狀態設置用戶"""
         request = self.context.get('request')
         if request and hasattr(request, 'user') and request.user.is_authenticated:
-            # 如果用户已认证，设置用户
+            # 如果用戶已認證，設置用戶
             validated_data['user'] = request.user
         else:
-            # 如果未认证，使用默认用户或None
+            # 如果未認證，使用預設用戶或None
             from django.contrib.auth import get_user_model
             User = get_user_model()
             default_user = User.objects.filter(is_superuser=True).first()

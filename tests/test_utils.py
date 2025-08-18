@@ -16,31 +16,31 @@ from maya_sawa_v2.api.serializers import (
 
 
 class TestMessageSerializer:
-    """消息序列化器測試"""
+    """訊息序列化器測試"""
 
     def test_message_serializer_fields(self):
-        """測試消息序列化器字段"""
+        """測試訊息序列化器欄位"""
         serializer = MessageSerializer()
         expected_fields = {'id', 'message_type', 'content', 'metadata', 'created_at'}
         assert set(serializer.fields.keys()) == expected_fields
 
     def test_message_serializer_validation_valid_data(self):
-        """測試消息序列化器有效數據驗證"""
-        data = {'message_type': 'user', 'content': '測試消息', 'metadata': {'key': 'value'}}
+        """測試訊息序列化器有效資料驗證"""
+        data = {'message_type': 'user', 'content': '測試訊息', 'metadata': {'key': 'value'}}
 
         serializer = MessageSerializer(data=data)
         assert serializer.is_valid()
 
     def test_message_serializer_validation_invalid_type(self):
-        """測試消息序列化器無效類型驗證"""
-        data = {'message_type': 'invalid_type', 'content': '測試消息'}
+        """測試訊息序列化器無效類型驗證"""
+        data = {'message_type': 'invalid_type', 'content': '測試訊息'}
 
         serializer = MessageSerializer(data=data)
         assert not serializer.is_valid()
         assert 'message_type' in serializer.errors
 
     def test_message_serializer_validation_empty_content(self):
-        """測試消息序列化器空內容驗證"""
+        """測試訊息序列化器空內容驗證"""
         data = {
             'type': 'user',
             'content': ''
@@ -51,14 +51,14 @@ class TestMessageSerializer:
         assert 'content' in serializer.errors
 
     def test_message_serializer_metadata_validation(self):
-        """測試消息序列化器元數據驗證"""
-        # 測試有效的 JSON 元數據
-        data = {'message_type': 'user', 'content': '測試消息', 'metadata': {'key': 'value', 'number': 123}}
+        """測試訊息序列化器元資料驗證"""
+        # 測試有效的 JSON 元資料
+        data = {'message_type': 'user', 'content': '測試訊息', 'metadata': {'key': 'value', 'number': 123}}
 
         serializer = MessageSerializer(data=data)
         assert serializer.is_valid()
 
-        # 放寬元數據類型測試：metadata 允許字串（由後端轉存）
+        # 放寬元資料類型測試：metadata 允許字串（由後端轉存）
         data['metadata'] = 'invalid_json'
         serializer = MessageSerializer(data=data)
         assert serializer.is_valid()
@@ -68,16 +68,16 @@ class TestConversationSerializer:
     """對話序列化器測試"""
 
     def test_conversation_serializer_fields(self):
-        """測試對話序列化器字段"""
+        """測試對話序列化器欄位"""
         serializer = ConversationSerializer()
         expected_fields = {'id', 'session_id', 'conversation_type', 'status', 'title', 'messages', 'created_at', 'updated_at'}
         assert set(serializer.fields.keys()) == expected_fields
 
     def test_conversation_serializer_validation_valid_data(self):
-        """測試對話序列化器有效數據驗證"""
+        """測試對話序列化器有效資料驗證"""
         data = {'session_id': 'test-session-123', 'conversation_type': 'general', 'status': 'active', 'title': '測試對話'}
 
-        # 不觸發 DB：只檢查字段存在（避免 UniqueValidator 查 DB）
+        # 不觸發 DB：只檢查欄位存在（避免 UniqueValidator 查 DB）
         serializer = ConversationSerializer(data=data)
         try:
             serializer.is_valid(raise_exception=False)
@@ -117,29 +117,29 @@ class TestConversationSerializer:
 
 
 class TestCreateMessageSerializer:
-    """創建消息序列化器測試"""
+    """建立訊息序列化器測試"""
 
     def test_create_message_serializer_fields(self):
-        """測試創建消息序列化器字段"""
+        """測試建立訊息序列化器欄位"""
         serializer = CreateMessageSerializer()
         expected_fields = {'content', 'ai_model_id'}
         assert set(serializer.fields.keys()) == expected_fields
 
     def test_create_message_serializer_validation_valid_data(self):
-        """測試創建消息序列化器有效數據驗證"""
+        """測試建立訊息序列化器有效資料驗證"""
         data = {
-            'content': '測試消息',
+            'content': '測試訊息',
             'ai_model_id': 1,
             'metadata': {'key': 'value'}
         }
 
         # 避免 DB：移除 ai_model 驗證
-        data = {'content': '測試消息'}
+        data = {'content': '測試訊息'}
         serializer = CreateMessageSerializer(data=data)
         assert serializer.is_valid()
 
     def test_create_message_serializer_validation_empty_content(self):
-        """測試創建消息序列化器空內容驗證"""
+        """測試建立訊息序列化器空內容驗證"""
         data = {
             'content': '',
             'ai_model_id': 1
@@ -150,7 +150,7 @@ class TestCreateMessageSerializer:
         assert 'content' in serializer.fields
 
     def test_create_message_serializer_validation_missing_content(self):
-        """測試創建消息序列化器缺少內容驗證"""
+        """測試建立訊息序列化器缺少內容驗證"""
         data = {
             'ai_model_id': 1
         }
@@ -159,14 +159,14 @@ class TestCreateMessageSerializer:
         assert 'content' in serializer.fields
 
     def test_create_message_serializer_optional_fields(self):
-        """測試創建消息序列化器可選字段"""
-        # 測試只有必要字段
+        """測試建立訊息序列化器可選欄位"""
+        # 測試只有必要欄位
         data = {
-            'content': '測試消息'
+            'content': '測試訊息'
         }
 
         # 避免 DB：不帶 ai_model_id
-        data = {'content': '測試消息', 'metadata': {'key': 'value'}}
+        data = {'content': '測試訊息', 'metadata': {'key': 'value'}}
         serializer = CreateMessageSerializer(data=data)
         assert serializer.is_valid()
 
@@ -205,20 +205,20 @@ class TestUtilityFunctions:
         timestamp = utc_now.timestamp()
         assert isinstance(timestamp, float)
 
-        # 測試從時間戳創建時間
+        # 測試從時間戳建立時間
         from_timestamp = datetime.fromtimestamp(timestamp, tz=timezone.utc)
         assert from_timestamp.tzinfo == timezone.utc
 
     def test_string_validation(self):
-        """測試字符串驗證"""
-        # 測試有效字符串
+        """測試字串驗證"""
+        # 測試有效字串
         valid_strings = [
             'normal string',
             'string with 123 numbers',
             'string-with-dashes',
             'string_with_underscores',
             'string with spaces',
-            '中文字符串',
+            '中文字串',
             'string with special chars: !@#$%^&*()',
             ''
         ]
@@ -226,7 +226,7 @@ class TestUtilityFunctions:
         for s in valid_strings:
             assert isinstance(s, str)
 
-        # 測試無效字符串（非字符串類型）
+        # 測試無效字串（非字串類型）
         invalid_strings = [123, True, False, None, [], {}]
 
         for s in invalid_strings:
@@ -301,9 +301,9 @@ class TestErrorHandling:
         try:
             raise ValueError("測試異常")
         except ValueError as e:
-            # 添加上下文信息
-            context = f"處理數據時發生錯誤: {str(e)}"
-            assert "處理數據時發生錯誤" in context
+            # 添加上下文資訊
+            context = f"處理資料時發生錯誤: {str(e)}"
+            assert "處理資料時發生錯誤" in context
             assert "測試異常" in context
 
     def test_logging_simulation(self):
@@ -320,7 +320,7 @@ class TestErrorHandling:
             log_messages.append((level, message))
 
         # 模擬日誌調用
-        mock_log(logging.INFO, "信息日誌")
+        mock_log(logging.INFO, "資訊日誌")
         mock_log(logging.WARNING, "警告日誌")
         mock_log(logging.ERROR, "錯誤日誌")
 
@@ -331,10 +331,10 @@ class TestErrorHandling:
 
 
 class TestDataValidation:
-    """數據驗證測試"""
+    """資料驗證測試"""
 
     def test_required_field_validation(self):
-        """測試必填字段驗證"""
+        """測試必填欄位驗證"""
         def validate_required_fields(data, required_fields):
             missing_fields = []
             for field in required_fields:
@@ -342,20 +342,20 @@ class TestDataValidation:
                     missing_fields.append(field)
             return missing_fields
 
-        # 測試有效數據
+        # 測試有效資料
         valid_data = {'name': 'test', 'email': 'test@example.com', 'age': 25}
         required_fields = ['name', 'email']
         missing = validate_required_fields(valid_data, required_fields)
         assert missing == []
 
-        # 測試無效數據
+        # 測試無效資料
         invalid_data = {'name': '', 'email': None}
         missing = validate_required_fields(invalid_data, required_fields)
         assert 'name' in missing
         assert 'email' in missing
 
     def test_data_type_validation(self):
-        """測試數據類型驗證"""
+        """測試資料類型驗證"""
         def validate_types(data, type_spec):
             errors = []
             for field, expected_type in type_spec.items():
@@ -363,19 +363,19 @@ class TestDataValidation:
                     errors.append(f"{field} 應該是 {expected_type.__name__} 類型")
             return errors
 
-        # 測試有效數據
+        # 測試有效資料
         valid_data = {'name': 'test', 'age': 25, 'active': True}
         type_spec = {'name': str, 'age': int, 'active': bool}
         errors = validate_types(valid_data, type_spec)
         assert errors == []
 
-        # 測試無效數據
+        # 測試無效資料
         invalid_data = {'name': 123, 'age': '25', 'active': 'true'}
         errors = validate_types(invalid_data, type_spec)
         assert len(errors) == 3
 
     def test_data_range_validation(self):
-        """測試數據範圍驗證"""
+        """測試資料範圍驗證"""
         def validate_range(data, range_spec):
             errors = []
             for field, (min_val, max_val) in range_spec.items():
@@ -385,13 +385,13 @@ class TestDataValidation:
                         errors.append(f"{field} 應該在 {min_val} 和 {max_val} 之間")
             return errors
 
-        # 測試有效數據
+        # 測試有效資料
         valid_data = {'age': 25, 'score': 85}
         range_spec = {'age': (0, 150), 'score': (0, 100)}
         errors = validate_range(valid_data, range_spec)
         assert errors == []
 
-        # 測試無效數據
+        # 測試無效資料
         invalid_data = {'age': -5, 'score': 150}
         errors = validate_range(invalid_data, range_spec)
         assert len(errors) == 2

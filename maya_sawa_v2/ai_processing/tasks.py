@@ -28,7 +28,7 @@ def process_ai_response(self, task_id):
 
 
 def process_ai_response_sync(user_message, ai_model, knowledge_context: str | None = None):
-    """同步处理AI回应，支持外部知識上下文"""
+    """同步處理AI回應，支援外部知識上下文"""
     try:
         service = AIResponseService()
         return service.process_sync(user_message=user_message, ai_model=ai_model, knowledge_context=knowledge_context)

@@ -46,7 +46,7 @@ class TestMockProvider:
     def test_mock_provider_with_context(self):
         """測試 MockProvider 帶上下文的回應"""
         provider = MockProvider()
-        message = "測試消息"
+        message = "測試訊息"
         context = {"conversation_history": [{"role": "user", "content": "之前的話"}]}
 
         response = provider.generate_response(message, context)
@@ -130,7 +130,7 @@ class TestOpenAIProvider:
         response = provider.generate_response("你好", context)
 
         assert response == "AI 回應"
-        # 驗證調用參數包含系統消息
+        # 驗證調用參數包含系統訊息
         call_args = mock_client.chat.completions.create.call_args
         messages = call_args[1]['messages']
         assert any(msg['role'] == 'system' for msg in messages)

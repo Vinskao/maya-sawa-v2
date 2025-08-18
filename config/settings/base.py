@@ -375,7 +375,7 @@ CELERY_TASK_ROUTES = {
 # ------------------------------------------------------------------------------
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Maya Sawa V2 API',
-    'DESCRIPTION': 'AI对话系统API文档',
+    'DESCRIPTION': 'AI對話系統API文檔',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
     'COMPONENT_SPLIT_REQUEST': True,
@@ -384,16 +384,16 @@ SPECTACULAR_SETTINGS = {
 
 # API Security Configuration
 # ------------------------------------------------------------------------------
-# 控制API是否需要认证
+# 控制API是否需要認證
 API_REQUIRE_AUTHENTICATION = env.bool('API_REQUIRE_AUTHENTICATION', default=False)
 
-# 控制API是否需要CSRF保护
+# 控制API是否需要CSRF保護
 API_REQUIRE_CSRF = env.bool('API_REQUIRE_CSRF', default=False)
 
-# 允许的API来源（CORS设置）
+# 允許的API來源（CORS設置）
 API_ALLOWED_ORIGINS = env.list('API_ALLOWED_ORIGINS', default=['http://localhost:3000', 'http://127.0.0.1:3000'])
 
-# API速率限制设置
+# API速率限制設置
 API_RATE_LIMIT_ENABLED = env.bool('API_RATE_LIMIT_ENABLED', default=False)
 API_RATE_LIMIT_PER_MINUTE = env.int('API_RATE_LIMIT_PER_MINUTE', default=60)
 

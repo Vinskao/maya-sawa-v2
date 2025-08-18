@@ -42,7 +42,7 @@ class FilterChainManager:
         """執行過濾器鏈"""
         logger.info(f"Starting filter chain processing for message: {context.message[:50]}...")
 
-        # 創建初始結果
+        # 建立初始結果
         result = FilterResult()
 
         # 按優先級執行過濾器

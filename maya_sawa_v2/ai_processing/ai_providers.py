@@ -44,7 +44,7 @@ class OpenAIProvider(AIProvider):
             if self.organization:
                 client_kwargs['organization'] = self.organization
 
-            # 調試信息
+            # 調試資訊
             logger.info(f"Creating OpenAI client with kwargs: {client_kwargs}")
 
             # 確保沒有傳遞不支援的參數，並明確排除 proxy 相關參數

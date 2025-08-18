@@ -1,6 +1,6 @@
 """
-编程知识库源 - 整合paprika的source逻辑
-专门处理编程相关问题，从paprika API获取真实数据
+程式設計知識庫源 - 整合paprika的source邏輯
+專門處理程式設計相關問題，從paprika API獲取真實資料
 """
 
 import logging
@@ -22,23 +22,23 @@ logger = logging.getLogger(__name__)
 
 
 class ProgrammingKMSource(BaseKMSource):
-    """编程知识库源 - 整合所有编程相关数据"""
+    """程式設計知識庫源 - 整合所有程式設計相關資料"""
 
     def __init__(self, config: Dict[str, Any] = None):
         super().__init__("programming_km", config)
 
         # Paprika API 配置
         self.paprika_api_url = self.config.get('paprika_api_url', 'https://peoplesystem.tatdvsonorth.com/paprika/articles')
-        self.cache_timeout = self.config.get('cache_timeout', 3600)  # 缓存1小时
+        self.cache_timeout = self.config.get('cache_timeout', 3600)  # 快取1小時
         self._articles_cache = None
         self._cache_timestamp = 0
 
-        # 移除硬编码关键词 - 让AI处理相关性判断
+        # 移除硬編碼關鍵詞 - 讓AI處理相關性判斷
 
     async def _fetch_articles_from_paprika(self) -> List[Dict[str, Any]]:
-        """从paprika API获取文章数据"""
+        """從paprika API獲取文章資料"""
         if not httpx:
-            logger.error("httpx 未安装，无法获取paprika文章")
+            logger.error("httpx 未安裝，無法獲取paprika文章")
             return []
 
         try:
@@ -48,23 +48,23 @@ class ProgrammingKMSource(BaseKMSource):
                 data = response.json()
 
                 if not data.get("success"):
-                    logger.error("Paprika API 返回错误")
+                    logger.error("Paprika API 返回錯誤")
                     return []
 
                 articles = data.get("data", [])
-                logger.info("从paprika API获取了 %d 篇文章", len(articles))
+                logger.info("從paprika API獲取了 %d 篇文章", len(articles))
                 return articles
 
         except Exception as e:
-            logger.error("获取paprika文章时发生错误: %s", str(e))
+            logger.error("獲取paprika文章時發生錯誤: %s", str(e))
             return []
 
     def _get_cached_articles(self) -> List[Dict[str, Any]]:
-        """获取缓存的文章数据"""
+        """獲取快取的文章資料"""
         import time
         current_time = time.time()
 
-        # 如果缓存过期或不存在，重新获取
+        # 如果快取過期或不存在，重新獲取
         if (self._articles_cache is None or
             current_time - self._cache_timestamp > self.cache_timeout):
 
@@ -94,25 +94,25 @@ class ProgrammingKMSource(BaseKMSource):
                         loop.close()
                     self._cache_timestamp = current_time
                 except Exception as e2:
-                    logger.error("获取文章缓存失败: %s / %s", str(e), str(e2))
+                    logger.error("獲取文章快取失敗: %s / %s", str(e), str(e2))
                     if self._articles_cache is None:
                         self._articles_cache = []
 
         return self._articles_cache or []
 
     def get_priority(self) -> int:
-        """编程知识库优先级 - 高优先级"""
+        """程式設計知識庫優先級 - 高優先級"""
         return 10
 
     def is_suitable_for(self, query: KMQuery) -> bool:
-        """简单判断：如果filter已经识别为programming_km，就处理"""
-        # 信任filter链的判断 - 如果调用到这里，说明filter已经判断这是编程问题
+        """簡單判斷：如果filter已經識別為programming_km，就處理"""
+        # 信任filter鏈的判斷 - 如果調用至此，說明filter已經判斷這是程式設計問題
         return (query.domain == 'programming' or
                 'programming_km' in str(query.metadata) or
                 query.metadata.get('km_source') == 'programming_km')
 
     def search(self, query: KMQuery) -> List[KMResult]:
-        """搜索编程知识库，支持中英文與回退策略，並回傳引用資訊"""
+        """搜索程式設計知識庫，支援中英文與回退策略，並回傳引用資訊"""
         results: List[KMResult] = []
 
         try:
@@ -529,12 +529,12 @@ class ProgrammingKMSource(BaseKMSource):
         return filtered
 
     def _extract_title_from_content(self, content: str) -> str:
-        """从内容中提取标题"""
+        """從內容中提取標題"""
         lines = content.split('\n')
-        for line in lines[:5]:  # 检查前5行
+        for line in lines[:5]:  # 檢查前5行
             line = line.strip()
-            if line and len(line) < 100:  # 标题通常比较短
+            if line and len(line) < 100:  # 標題通常比較短
                 return line
-        return "编程文档"
+        return "程式設計文檔"
 
 

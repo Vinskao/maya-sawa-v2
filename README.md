@@ -83,13 +83,20 @@ sequenceDiagram
     A->>KM: Hybrid Search(trigram + pgvector)
     KM->>DB: 檢索 articles.content/embedding
     DB-->>A: Top-K 相關內容
-    A->>AI: 調用指定模型(OpenAI/Gemini/Qwen/Mock)
-    AI-->>A: 回傳 AI 回應
+    
+    alt 找到相關內容
+        A->>AI: 調用指定模型 + 知識庫內容
+        AI-->>A: 回傳 AI 回應 + 引用
+    else 未找到相關內容
+        A->>AI: 調用指定模型(無知識庫內容)
+        AI-->>A: 回傳「無法從資料庫找到資料」說明
+    end
+    
     A->>R: 追加 AI 訊息(chat:session)
     A->>DB: 建立 AI Message
-    A-->>F: 回傳 AI 回應 + 引用
+    A-->>F: 回傳 AI 回應 + knowledge_used 狀態
 
-    Note over F,R: 可用 GET /maya-v2/chat-history/{session_id}
+    Note over F,R: 可用 GET /maya-sawa/qa/chat-history/{session_id}
 ```
 
 ## 全文檢索混和 Embedding 架構圖
@@ -303,7 +310,6 @@ curl -X POST "http://127.0.0.1:8000/maya-v2/ask-with-model/" \
     "use_knowledge_base": true
   }'
 
-# 使用 Qwen Turbo 模型
 curl -X POST "http://127.0.0.1:8000/maya-v2/ask-with-model/" \
   -H "Content-Type: application/json" \
   -d '{
@@ -335,7 +341,7 @@ curl -X POST "http://127.0.0.1:8000/maya-v2/ask-with-model/" \
 
 ### 獲取對話歷史
 ```bash
-curl -X GET "http://127.0.0.1:8000/maya-v2/chat-history/{session_id}/"
+curl -X GET "http://127.0.0.1:8000/maya-sawa/qa/chat-history/{session_id}/"
 ```
 
 ### 知識庫功能

@@ -12,9 +12,9 @@ from django.conf import settings
 
 @pytest.fixture(scope="session")
 def django_db_setup(django_db_setup, django_db_blocker):
-    """設置測試數據庫"""
+    """設置測試資料庫"""
     with django_db_blocker.unblock():
-        # 這裡可以添加測試數據庫的初始化邏輯
+        # 這裡可以添加測試資料庫的初始化邏輯
         pass
 
 
@@ -22,7 +22,7 @@ def django_db_setup(django_db_setup, django_db_blocker):
 def mock_settings():
     """模擬 Django 設置"""
     with patch('django.conf.settings') as mock_settings:
-        # 設置默認的測試配置
+        # 設置預設的測試配置
         mock_settings.API_REQUIRE_AUTHENTICATION = False
         mock_settings.API_REQUIRE_CSRF = False
         mock_settings.API_RATE_LIMIT_ENABLED = False
@@ -32,11 +32,11 @@ def mock_settings():
 
 @pytest.fixture
 def temp_env_file():
-    """創建臨時 .env 文件"""
+    """建立臨時 .env 文件"""
     temp_dir = tempfile.mkdtemp()
     env_file_path = os.path.join(temp_dir, '.env')
 
-    # 創建測試用的 .env 文件
+    # 建立測試用的 .env 文件
     env_content = """
 # Django Settings
 DJANGO_DEBUG=True
@@ -124,7 +124,7 @@ def mock_celery_task():
 
 @pytest.fixture
 def sample_conversation_data():
-    """樣本對話數據"""
+    """樣本對話資料"""
     return {
         'session_id': 'test-session-123',
         'type': 'chat',
@@ -135,10 +135,10 @@ def sample_conversation_data():
 
 @pytest.fixture
 def sample_message_data():
-    """樣本消息數據"""
+    """樣本訊息資料"""
     return {
         'type': 'user',
-        'content': '你好，這是一個測試消息',
+        'content': '你好，這是一個測試訊息',
         'metadata': {
             'source': 'test',
             'timestamp': '2024-01-01T00:00:00Z'
@@ -148,7 +148,7 @@ def sample_message_data():
 
 @pytest.fixture
 def sample_ai_model_data():
-    """樣本 AI 模型數據"""
+    """樣本 AI 模型資料"""
     return {
         'name': 'GPT-4o-mini',
         'provider': 'openai',
@@ -164,7 +164,7 @@ def sample_ai_model_data():
 
 @pytest.fixture
 def mock_user():
-    """模擬用戶"""
+    """模擬使用者"""
     user = MagicMock()
     user.id = 1
     user.username = 'testuser'
@@ -176,14 +176,14 @@ def mock_user():
 
 @pytest.fixture
 def mock_anonymous_user():
-    """模擬匿名用戶"""
+    """模擬匿名使用者"""
     from django.contrib.auth.models import AnonymousUser
     return AnonymousUser()
 
 
 @pytest.fixture
 def mock_request():
-    """模擬請求對象"""
+    """模擬請求物件"""
     from django.test import RequestFactory
 
     factory = RequestFactory()
@@ -195,7 +195,7 @@ def mock_request():
 
 @pytest.fixture
 def mock_view():
-    """模擬視圖對象"""
+    """模擬視圖物件"""
     view = MagicMock()
     view.action = 'list'
     view.request = MagicMock()
@@ -293,7 +293,7 @@ def mock_environment_variables():
 
 @pytest.fixture
 def mock_file_operations():
-    """模擬文件操作"""
+    """模擬檔案操作"""
     with patch('builtins.open', mock_open()) as mock_file:
         with patch('os.path.exists', return_value=True):
             with patch('os.makedirs'):
@@ -320,7 +320,7 @@ def sample_error_response():
     """樣本錯誤回應"""
     return {
         'error': '操作失敗',
-        'message': '詳細錯誤信息',
+        'message': '詳細錯誤資訊',
         'code': 'ERROR_CODE',
         'timestamp': '2024-01-01T00:00:00Z'
     }

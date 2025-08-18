@@ -1,5 +1,5 @@
 """
-知识库源基类 - 独立的基础模块
+知識庫源基類 - 獨立的基礎模組
 """
 
 from abc import ABC, abstractmethod
@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 @dataclass
 class KMQuery:
-    """知识库查询请求"""
+    """知識庫查詢請求"""
     query: str
     user_id: int
     conversation_id: str
@@ -24,7 +24,7 @@ class KMQuery:
 
 @dataclass
 class KMResult:
-    """知识库查询结果"""
+    """知識庫查詢結果"""
     content: str
     source: str
     confidence: float
@@ -37,7 +37,7 @@ class KMResult:
 
 
 class BaseKMSource(ABC):
-    """知识库源基类"""
+    """知識庫源基類"""
 
     def __init__(self, name: str, config: Dict[str, Any] = None):
         self.name = name
@@ -45,18 +45,18 @@ class BaseKMSource(ABC):
 
     @abstractmethod
     def search(self, query: KMQuery) -> List[KMResult]:
-        """搜索知识库"""
+        """搜索知識庫"""
         pass
 
     @abstractmethod
     def is_suitable_for(self, query: KMQuery) -> bool:
-        """判断是否适合处理此查询"""
+        """判斷是否適合處理此查詢"""
         pass
 
     def get_priority(self) -> int:
-        """获取优先级，数字越小优先级越高"""
+        """獲取優先級，數字越小優先級越高"""
         return 100
 
     def get_source_type(self) -> str:
-        """获取源类型"""
+        """獲取源類型"""
         return self.__class__.__name__.lower()

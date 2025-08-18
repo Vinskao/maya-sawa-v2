@@ -22,37 +22,37 @@ logger = logging.getLogger(__name__)
 
 class ConversationViewSet(viewsets.ModelViewSet):
     """
-    对话管理视图集
+    對話管理視圖集
 
-    提供对话的CRUD操作，包括：
-    - 创建、读取、更新、删除对话
-    - 发送消息并触发AI处理
-    - 获取对话消息历史
-    - 获取可用的AI模型
+    提供對話的CRUD操作，包括：
+    - 建立、讀取、更新、刪除對話
+    - 發送訊息並觸發AI處理
+    - 獲取對話訊息歷史
+    - 獲取可用的AI模型
     """
     permission_classes = [AllowAnyPermission]
     serializer_class = ConversationSerializer
 
     def get_queryset(self):
-        """获取对话列表 - 根据认证状态决定过滤条件"""
+        """獲取對話列表 - 根據認證狀態決定過濾條件"""
         if getattr(self.request, 'user', None) and self.request.user.is_authenticated:
-            # 如果用户已认证，只返回该用户的对话
+            # 如果用戶已認證，只返回該用戶的對話
             return Conversation.objects.filter(user=self.request.user)
         else:
-            # 如果未认证，返回所有对话（开发模式）
+            # 如果未認證，返回所有對話（開發模式）
             return Conversation.objects.all()
 
     @action(detail=True, methods=['post'])
     def send_message(self, request, pk=None):
         """
-        发送消息并触发AI处理
+        發送訊息並觸發AI處理
 
-        参数:
-        - content: 消息内容
-        - ai_model_id: 可选的AI模型ID
+        參數:
+        - content: 訊息內容
+        - ai_model_id: 可選的AI模型ID
 
         返回:
-        - message_id: 创建的消息ID
+        - message_id: 建立的訊息ID
         """
         conversation = self.get_object()
 
@@ -73,9 +73,9 @@ class ConversationViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def messages(self, request, pk=None):
         """
-        获取对话的所有消息
+        獲取對話的所有訊息
 
-        返回对话的完整消息历史，包括用户消息和AI回复
+        返回對話的完整訊息歷史，包括用戶訊息和AI回覆
         """
         conversation = self.get_object()
         messages = conversation.messages.all()
@@ -85,9 +85,9 @@ class ConversationViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def available_models(self, request):
         """
-        获取可用的AI模型列表
+        獲取可用的AI模型列表
 
-        返回所有启用的AI模型，包括模型名称、提供者等信息
+        返回所有啟用的AI模型，包括模型名稱、提供者等資訊
         """
         models = AIModel.objects.filter(is_active=True)
         serializer = AIModelSerializer(models, many=True)
@@ -96,13 +96,13 @@ class ConversationViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def ai_providers(self, request):
         """
-        获取AI提供者配置
+        獲取AI提供者配置
 
-        返回所有AI提供者的配置信息，包括：
-        - 提供者名称
+        返回所有AI提供者的配置資訊，包括：
+        - 提供者名稱
         - 可用模型列表
-        - 默认模型
-        - 启用状态
+        - 預設模型
+        - 啟用狀態
         """
         providers_config = AIProviderConfig.get_all_providers_config()
 
@@ -126,26 +126,26 @@ class ConversationViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def task_status(self, request):
         """
-        查看任务处理状态
+        查看任務處理狀態
 
-        查询参数:
-        - task_id: 任务ID
+        查詢參數:
+        - task_id: 任務ID
 
-        示例:
+        範例:
         GET /maya-v2/conversations/task_status/?task_id=1
         """
         task_id = request.query_params.get('task_id')
 
         if not task_id:
             return Response({
-                'error': '任务ID参数是必需的'
+                'error': '任務ID參數是必需的'
             }, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             from maya_sawa_v2.ai_processing.models import ProcessingTask
             task = ProcessingTask.objects.get(id=task_id)
 
-            # 获取最新的AI消息
+            # 獲取最新的AI訊息
             ai_message = None
             if task.status == 'completed':
                 ai_message = task.conversation.messages.filter(
@@ -165,31 +165,31 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
         except ProcessingTask.DoesNotExist:
             return Response({
-                'error': f'任务 {task_id} 不存在'
+                'error': f'任務 {task_id} 不存在'
             }, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({
-                'error': f'查询任务状态时发生错误: {str(e)}'
+                'error': f'查詢任務狀態時發生錯誤: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class AIModelViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    AI模型视图集
+    AI模型視圖集
 
-    提供AI模型的只读操作，包括：
-    - 获取所有AI模型列表
-    - 获取单个AI模型详情
-    - 支持包含/排除不可用模型的查询参数
+    提供AI模型的只讀操作，包括：
+    - 獲取所有AI模型列表
+    - 獲取單個AI模型詳情
+    - 支援包含/排除不可用模型的查詢參數
     """
     permission_classes = [AllowAnyPermission]
     serializer_class = AIModelSerializer
 
     def get_queryset(self):
         """
-        根据查询参数决定是否包含不可用的模型
+        根據查詢參數決定是否包含不可用的模型
 
-        查询参数:
+        查詢參數:
         - include_inactive: 是否包含不可用的模型 (true/false)
         """
         include_inactive = self.request.query_params.get('include_inactive', 'false').lower() == 'true'

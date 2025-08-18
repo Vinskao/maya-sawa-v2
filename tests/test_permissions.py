@@ -32,7 +32,7 @@ class TestDynamicAuthenticationPermission:
         # 設置需要認證
         mock_settings.API_REQUIRE_AUTHENTICATION = True
 
-        # 創建已認證用戶的請求
+        # 建立已認證用戶的請求
         user = MagicMock()
         user.is_authenticated = True
         request = self.factory.get('/')
@@ -42,7 +42,7 @@ class TestDynamicAuthenticationPermission:
         result = self.permission.has_permission(request, None)
         assert result is True
 
-        # 創建未認證用戶的請求
+        # 建立未認證用戶的請求
         request.user = AnonymousUser()
 
         # 測試未認證用戶
@@ -55,7 +55,7 @@ class TestDynamicAuthenticationPermission:
         # 設置不需要認證
         mock_settings.API_REQUIRE_AUTHENTICATION = False
 
-        # 創建已認證用戶的請求
+        # 建立已認證用戶的請求
         user = MagicMock()
         user.is_authenticated = True
         request = self.factory.get('/')
@@ -65,7 +65,7 @@ class TestDynamicAuthenticationPermission:
         result = self.permission.has_permission(request, None)
         assert result is True
 
-        # 創建未認證用戶的請求
+        # 建立未認證用戶的請求
         request.user = AnonymousUser()
 
         # 測試未認證用戶
@@ -79,11 +79,11 @@ class TestDynamicAuthenticationPermission:
         if hasattr(mock_settings, 'API_REQUIRE_AUTHENTICATION'):
             delattr(mock_settings, 'API_REQUIRE_AUTHENTICATION')
 
-        # 創建未認證用戶的請求
+        # 建立未認證用戶的請求
         request = self.factory.get('/')
         request.user = AnonymousUser()
 
-        # 測試未認證用戶（默認允許）
+        # 測試未認證用戶（預設允許）
         result = self.permission.has_permission(request, None)
         assert result is True
 
@@ -93,7 +93,7 @@ class TestDynamicAuthenticationPermission:
         # 設置需要認證
         mock_settings.API_REQUIRE_AUTHENTICATION = True
 
-        # 創建用戶為 None 的請求
+        # 建立用戶為 None 的請求
         request = self.factory.get('/')
         request.user = None
 
@@ -107,10 +107,10 @@ class TestDynamicAuthenticationPermission:
         # 設置需要認證
         mock_settings.API_REQUIRE_AUTHENTICATION = True
 
-        # 創建模擬視圖
+        # 建立模擬視圖
         view = MagicMock()
 
-        # 創建已認證用戶的請求
+        # 建立已認證用戶的請求
         user = MagicMock()
         user.is_authenticated = True
         request = self.factory.get('/')
@@ -135,7 +135,7 @@ class TestAllowAnyPermission:
 
     def test_has_permission_with_authenticated_user(self):
         """測試已認證用戶的權限檢查"""
-        # 創建已認證用戶的請求
+        # 建立已認證用戶的請求
         user = MagicMock()
         user.is_authenticated = True
         request = self.factory.get('/')
@@ -146,7 +146,7 @@ class TestAllowAnyPermission:
 
     def test_has_permission_with_anonymous_user(self):
         """測試匿名用戶的權限檢查"""
-        # 創建匿名用戶的請求
+        # 建立匿名用戶的請求
         request = self.factory.get('/')
         request.user = AnonymousUser()
 
@@ -155,7 +155,7 @@ class TestAllowAnyPermission:
 
     def test_has_permission_with_none_user(self):
         """測試用戶為 None 的權限檢查"""
-        # 創建用戶為 None 的請求
+        # 建立用戶為 None 的請求
         request = self.factory.get('/')
         request.user = None
 
@@ -175,10 +175,10 @@ class TestAllowAnyPermission:
 
     def test_has_permission_with_view_context(self):
         """測試帶視圖上下文的權限檢查"""
-        # 創建模擬視圖
+        # 建立模擬視圖
         view = MagicMock()
 
-        # 創建請求
+        # 建立請求
         request = self.factory.get('/')
         request.user = AnonymousUser()
 
@@ -187,7 +187,7 @@ class TestAllowAnyPermission:
 
     def test_has_permission_consistency(self):
         """測試權限檢查的一致性"""
-        # 創建多個不同的請求
+        # 建立多個不同的請求
         requests = [
             self.factory.get('/'),
             self.factory.post('/'),
