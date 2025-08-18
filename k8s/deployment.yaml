@@ -22,7 +22,7 @@ spec:
       containers:
         - name: web
           image: papakao/maya-sawa-v2:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - containerPort: 8000
           resources:
@@ -89,7 +89,7 @@ spec:
             periodSeconds: 30
         - name: worker
           image: papakao/maya-sawa-v2:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           command: ["bash", "-lc", "celery -A config worker -l info -Q ${REDIS_QUEUE_MAYA_V2:-maya_v2}"]
           resources:
             requests:

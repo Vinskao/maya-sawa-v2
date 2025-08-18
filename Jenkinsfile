@@ -173,9 +173,9 @@ pipeline {
                                   -n default \
                                   --dry-run=client -o yaml | kubectl apply -f -
 
-                                # Ensure old deployment is removed to avoid duplicate rollouts
-                                kubectl delete deploy maya-sawa-v2 -n default --ignore-not-found=true || true
-                                kubectl wait --for=delete deployment/maya-sawa-v2 -n default --timeout=120s || true
+                                # Force delete all maya-sawa-v2 resources to ensure clean slate
+                                kubectl delete deploy,rs,pods -l app.kubernetes.io/name=maya-sawa-v2 -n default --ignore-not-found=true --force=true --grace-period=0 || true
+                                kubectl wait --for=delete pods -l app.kubernetes.io/name=maya-sawa-v2 -n default --timeout=120s || true
 
                                 # Apply Deployment/Service/Worker
                                 kubectl apply -f k8s/deployment.yaml
