@@ -29,10 +29,10 @@ EXPOSE 8000
 # Default env (override in k8s)
 ENV DJANGO_SETTINGS_MODULE=config.settings.production \
     PORT=8000 \
-    GUNICORN_CMD_ARGS="--workers=3 --threads=4 --bind=0.0.0.0:8000 --timeout 120"
+    GUNICORN_CMD_ARGS="--workers=2 --threads=4 --bind=0.0.0.0:8000 --timeout 120"
 
-# Entrypoint script
-CMD ["bash", "-lc", "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn config.wsgi:application"]
+# Entrypoint script (migrations/static handled by initContainers on k8s)
+CMD ["bash", "-lc", "gunicorn config.wsgi:application"]
 
 
 
