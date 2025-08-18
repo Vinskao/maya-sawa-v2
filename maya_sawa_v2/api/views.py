@@ -305,8 +305,10 @@ def ask_with_model(request):
 
                 # 僅展示 Paprika 文章做為引用，且來源連結固定為 work URL
                 paprika_results = [r for r in km_results if (r.metadata or {}).get('source_type') == 'paprika_api']
+                knowledge_found = False
                 if paprika_results:
                     knowledge_context = "\n\n相關知識庫內容：\n"
+                    knowledge_found = True
                     for i, result in enumerate(paprika_results[:3]):  # 只取前3個結果
                         meta = (result.metadata or {})
                         title = meta.get('title') or '參考文章'
@@ -328,6 +330,8 @@ def ask_with_model(request):
                     logger.info(f"找到 {len(km_results)} 個知識庫結果")
                 else:
                     logger.info("未找到相關的知識庫內容")
+                    # 當沒有找到知識庫內容時，添加明確的說明
+                    knowledge_context = "\n\n注意：無法從知識庫中找到相關的資訊來回答您的問題。以下回答基於我的訓練資料。"
 
             except Exception as e:
                 logger.error(f"知識庫搜索失敗: {str(e)}")
@@ -338,7 +342,7 @@ def ask_with_model(request):
                 # 同步處理
                 response = process_ai_response_sync(user_message, ai_model, knowledge_context=knowledge_context)
 
-                # 如果有知識庫內容，將其添加到回應中
+                # 如果有知識庫內容或沒有找到知識庫內容的說明，將其添加到回應中
                 if knowledge_context:
                     response = f"{response}\n\n{knowledge_context}"
 
@@ -360,7 +364,7 @@ def ask_with_model(request):
                     },
                     'status': 'completed',
                     'ai_response': response,
-                    'knowledge_used': bool(knowledge_context),
+                    'knowledge_used': knowledge_found,
                     'knowledge_citations': knowledge_citations,
                     'message': 'AI回复已完成'
                 })
