@@ -174,7 +174,7 @@ pipeline {
                                   --dry-run=client -o yaml | kubectl apply -f -
 
                                 # Force delete all maya-sawa-v2 resources to ensure clean slate
-                                kubectl delete deploy,rs,pods -l app.kubernetes.io/name=maya-sawa-v2 -n default --ignore-not-found=true --force=true --grace-period=0 || true
+                                kubectl delete deploy,rs,pods,ingress -l app.kubernetes.io/name=maya-sawa-v2 -n default --ignore-not-found=true --force=true --grace-period=0 || true
                                 kubectl wait --for=delete pods -l app.kubernetes.io/name=maya-sawa-v2 -n default --timeout=120s || true
 
                                 # Apply Deployment/Service/Worker
