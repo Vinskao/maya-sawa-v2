@@ -12,6 +12,9 @@ graph TB
         B --> A1[ask-with-model]
         B --> A2[chat-history]
         B --> A3[available-models]
+        B --> A4[add-model]
+        B --> A5[healthz]
+        B --> A6[legacy-chat-history]
     end
 
     subgraph "服務層"
@@ -53,6 +56,7 @@ graph TB
     %% DB 關聯
     A1 --> D1
     A2 --> D2
+    A4 --> D1
 
     %% 註解
     D1:::db
@@ -86,6 +90,15 @@ sequenceDiagram
     
     alt 找到相關內容
         A->>AI: 調用指定模型 + 知識庫內容
+        AI-->>A: 回傳 AI 回應 + 引用資訊
+    else 未找到相關內容
+        A->>AI: 調用指定模型
+        AI-->>A: 回傳 AI 回應 + 無法找到知識庫說明
+    end
+    
+    
+    alt 找到相關內容
+        A->>AI: 調用指定模型 + 知識庫內容
         AI-->>A: 回傳 AI 回應 + 引用
     else 未找到相關內容
         A->>AI: 調用指定模型(無知識庫內容)
@@ -94,6 +107,7 @@ sequenceDiagram
     
     A->>R: 追加 AI 訊息(chat:session)
     A->>DB: 建立 AI Message
+    A-->>F: 回傳 AI 回應 + 知識庫狀態
     A-->>F: 回傳 AI 回應 + knowledge_used 狀態
 
     Note over F,R: 可用 GET /maya-sawa/qa/chat-history/{session_id}
@@ -136,7 +150,7 @@ graph TD
   %% 後處理與回傳
   TOPK --> CTX["Build Context from Articles<br/>(title + snippet)"]
   CTX --> AI["LLM Call (OpenAI/Gemini/Qwen/Mock)"]
-  AI --> RESP["Answer + Citations"]
+  AI --> RESP["Answer + Citations/No Knowledge Notice"]
   RESP --> RDS["Redis ChatHistory<br/>chat:session:{sid}"]
   RESP --> OUT["API Response"]
 
@@ -167,8 +181,6 @@ graph TD
 
 ### AI 提供者
 - **OpenAI** - GPT-4o-mini, GPT-4o, GPT-4.1-nano, GPT-3.5-turbo
-- **Google Gemini** - gemini-1.5-flash, gemini-1.5-pro
-- **Qwen** - qwen-turbo, qwen-plus
 - **Mock Provider** - 測試用模擬提供者
 
 ### 核心依賴
@@ -177,8 +189,6 @@ graph TD
 - **django-allauth 65.10.0** - 用戶認證
 - **psycopg 3.2.9** - PostgreSQL 驅動
 - **openai 1.12.0** - OpenAI API 客戶端
-- **google-generativeai 0.8.3** - Google Gemini API
-- **dashscope 1.14.0** - Qwen API 客戶端
 
 ## 快速開始
 
@@ -246,6 +256,7 @@ DB_SSLMODE=require
 ```
 
 #### AI 提供者配置
+目前本專案主要使用 OpenAI，其他提供者（Gemini、Qwen）已配置但需要額外設置：
 ```bash
 # 啟用的提供者
 ENABLED_PROVIDERS=openai,gemini,qwen,mock
@@ -270,6 +281,12 @@ QWEN_AVAILABLE_MODELS=qwen-turbo
 QWEN_DEFAULT_MODEL=qwen-turbo
 ```
 
+**注意：**
+- 目前系統預設只啟用 OpenAI 提供者
+- 如需使用 Gemini，請設置 `GOOGLE_API_KEY` 並在 `ENABLED_PROVIDERS` 中加入 `gemini`
+- 如需使用 Qwen，請設置 `QWEN_API_KEY` 並在 `ENABLED_PROVIDERS` 中加入 `qwen`
+- 所有提供者都支援 Mock 模式用於測試
+
 #### CORS 配置
 ```bash
 # 允許的來源
@@ -286,6 +303,16 @@ API_RATE_LIMIT_ENABLED=false
 ### 獲取可用模型列表
 ```bash
 curl -X GET "http://127.0.0.1:8000/maya-v2/available-models/"
+```
+
+### 添加 AI 模型
+```bash
+curl -X POST "http://127.0.0.1:8000/maya-v2/add-model/"
+```
+
+### 健康檢查
+```bash
+curl -X GET "http://127.0.0.1:8000/healthz"
 ```
 
 ### 使用指定模型進行對話
@@ -354,22 +381,6 @@ curl -X GET "http://127.0.0.1:8000/maya-sawa/qa/chat-history/{session_id}/"
 - `true`：使用了知識庫內容
 - `false`：未使用知識庫內容（會顯示說明訊息）
 
-### 傳統對話 API（已棄用）
-```bash
-# 創建對話
-curl -X POST "http://127.0.0.1:8000/maya-v2/conversations/" \
-  -H "Content-Type: application/json" \
-  -d '{"title": "新對話"}'
-
-# 發送訊息
-curl -X POST "http://127.0.0.1:8000/maya-v2/conversations/{conversation_id}/send_message/" \
-  -H "Content-Type: application/json" \
-  -d '{"content": "你好，請幫我解答問題"}'
-
-# 獲取對話訊息
-curl -X GET "http://127.0.0.1:8000/maya-v2/conversations/{conversation_id}/messages/"
-```
-
 ## 部署
 
 ### Docker 部署
@@ -383,6 +394,22 @@ docker run -d \
   -p 8000:8000 \
   --env-file .env \
   maya-sawa-v2
+```
+
+### 資料庫設置
+```bash
+# 1. 執行資料庫遷移
+poetry run python manage.py migrate
+
+# 2. 設置 AI 模型（會自動從環境變數讀取配置）
+poetry run python manage.py setup_ai_models
+
+# 3. 建置測試資料（可選）
+# 執行 SQL schema 文件來初始化資料庫結構和測試資料：
+psql -d your_database_name -f sql/db.sql
+
+# 4. 回填文章嵌入向量（如果 articles 表有內容）
+poetry run python manage.py backfill_article_embeddings
 ```
 
 ### 生產環境配置
@@ -431,6 +458,9 @@ poetry run python manage.py setup_ai_models
 
 # 切換 API 安全設置
 poetry run python manage.py toggle_api_security
+
+# 回填文章嵌入向量
+poetry run python manage.py backfill_article_embeddings
 
 # 查看可用模型
 poetry run python manage.py shell
