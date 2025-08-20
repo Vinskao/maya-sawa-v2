@@ -16,6 +16,10 @@ ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["*"])
 # ------------------------------------------------------------------------------
 DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=60)
 
+# Ensure connection pool limit is enforced in production
+DATABASES["default"].setdefault("OPTIONS", {})
+DATABASES["default"]["OPTIONS"]["MAX_CONNS"] = env.int("DB_MAX_CONNS", default=5)
+
 # CACHES
 # ------------------------------------------------------------------------------
 CACHES = {

@@ -175,7 +175,7 @@ graph TD
 - **Django 5.1.11** - Web 框架
 - **Django REST Framework 3.15.2** - API 框架
 - **Celery 5.4.0** - 異步任務處理
-- **PostgreSQL** - 主資料庫 (支援 pgvector 擴展)
+- **PostgreSQL** - 主資料庫 (支援 pgvector 擴展，連接限制 5 個)
 - **Redis 6.2.0** - 快取和 Celery Broker
 - **Poetry** - 依賴管理
 
@@ -236,6 +236,9 @@ poetry run python manage.py runserver
 
 # 10. Celery Worker（新終端）
 poetry run celery -A config worker -l info -Q maya_v2
+
+# 11. 監控資料庫連接（可選）
+poetry run python manage.py monitor_connections
 ```
 
 ### 環境變數配置
@@ -253,6 +256,10 @@ DB_DATABASE=maya_sawa_v2
 DB_USERNAME=user
 DB_PASSWORD=password
 DB_SSLMODE=require
+
+# 資料庫連接池設置（限制最多 5 個連接）
+CONN_MAX_AGE=60
+DB_MAX_CONNS=5
 ```
 
 #### AI 提供者配置
@@ -433,6 +440,30 @@ REDIS_URL=redis://:password@host:port/0
 CELERY_BROKER_URL=redis://:password@host:port/0
 CELERY_RESULT_BACKEND=redis://:password@host:port/0
 ```
+
+## 資料庫連接限制
+
+### 概述
+本專案已配置 PostgreSQL 資料庫連接限制，最多使用 5 個連接，以符合 Aiven PostgreSQL Free Tier 的 20 個連接限制。
+
+### 連接使用分析
+- **Web 應用程式容器**: 1-3 個連接
+- **Celery Worker 容器**: 1-2 個連接
+- **總計**: 2-5 個連接（正常運行時）
+
+### 監控連接使用
+```bash
+# 檢查當前連接狀態
+poetry run python manage.py check_db_connections
+
+# 持續監控連接使用
+poetry run python manage.py monitor_connections --interval 10 --count 20
+```
+
+### 配置詳情
+- 連接池最大連接數：5 個
+- 連接存活時間：60 秒
+- 環境變數：`DB_MAX_CONNS=5`, `CONN_MAX_AGE=60`
 
 ## 開發
 
