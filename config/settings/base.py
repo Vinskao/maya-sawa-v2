@@ -90,10 +90,9 @@ else:
 
 DATABASES["default"]["ATOMIC_REQUESTS"] = True
 
-# Database connection pool settings
-# Limit the maximum number of connections to 5
-DATABASES["default"].setdefault("OPTIONS", {})
-DATABASES["default"]["OPTIONS"]["MAX_CONNS"] = 5
+# Database connection pool settings for psycopg
+# Note: psycopg doesn't support MAX_CONNS option, use CONN_MAX_AGE instead
+DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=60)
 
 # https://docs.djangoproject.com/en/stable/ref/settings/#std:setting-DEFAULT_AUTO_FIELD
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

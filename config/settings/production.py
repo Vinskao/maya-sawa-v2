@@ -14,11 +14,9 @@ ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["*"])
 
 # DATABASES
 # ------------------------------------------------------------------------------
+# Connection pooling settings for psycopg
+# Note: psycopg doesn't support MAX_CONNS option, use CONN_MAX_AGE instead
 DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=60)
-
-# Ensure connection pool limit is enforced in production
-DATABASES["default"].setdefault("OPTIONS", {})
-DATABASES["default"]["OPTIONS"]["MAX_CONNS"] = env.int("DB_MAX_CONNS", default=5)
 
 # CACHES
 # ------------------------------------------------------------------------------
@@ -96,7 +94,7 @@ ACCOUNT_EMAIL_SUBJECT_PREFIX = EMAIL_SUBJECT_PREFIX
 # ADMIN
 # ------------------------------------------------------------------------------
 # Django Admin URL regex.
-ADMIN_URL = env("DJANGO_ADMIN_URL")
+ADMIN_URL = env("DJANGO_ADMIN_URL", default=env("MAYA_V2_ADMIN_URL", default="admin/"))
 
 # Email provider (Mailgun) — make optional
 # ------------------------------------------------------------------------------
