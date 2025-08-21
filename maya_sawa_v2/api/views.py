@@ -366,7 +366,7 @@ def ask_with_model(request):
                     'ai_response': response,
                     'knowledge_used': knowledge_found,
                     'knowledge_citations': knowledge_citations,
-                    'message': 'AI回复已完成'
+                    'message': 'AI回答已完成'
                 })
 
             except Exception as e:

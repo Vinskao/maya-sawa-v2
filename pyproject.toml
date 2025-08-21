@@ -16,7 +16,7 @@ fido2 = "1.1.2"
 django-crispy-forms = "2.4"
 crispy-bootstrap5 = "2025.6"
 django-redis = "6.0.0"
-whitenoise = "6.9.0"
+
 redis = "6.2.0"
 hiredis = "3.2.1"
 uvicorn = {extras = ["standard"], version = "0.35.0"}
@@ -56,7 +56,7 @@ sphinx-autobuild = "2024.10.3"
 [tool.poetry.group.prod.dependencies]
 gunicorn = "23.0.0"
 psycopg = "3.2.9"
-django-anymail = {extras = ["mailgun"], version = "13.0.1"}
+
 
 [tool.poetry.scripts]
 start = "manage:main"

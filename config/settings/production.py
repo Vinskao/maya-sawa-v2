@@ -71,7 +71,7 @@ STORAGES = {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
     },
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
     },
 }
 
@@ -96,24 +96,13 @@ ACCOUNT_EMAIL_SUBJECT_PREFIX = EMAIL_SUBJECT_PREFIX
 # Django Admin URL regex.
 ADMIN_URL = env("DJANGO_ADMIN_URL", default=env("MAYA_V2_ADMIN_URL", default="admin/"))
 
-# Email provider (Mailgun) — make optional
+# Email provider — simplified
 # ------------------------------------------------------------------------------
-_mailgun_api_key = env("MAILGUN_API_KEY", default=None)
-if _mailgun_api_key:
-    # Enable Anymail + Mailgun only when credentials are provided
-    INSTALLED_APPS += ["anymail"]
-    EMAIL_BACKEND = "anymail.backends.mailgun.EmailBackend"
-    ANYMAIL = {
-        "MAILGUN_API_KEY": _mailgun_api_key,
-        "MAILGUN_SENDER_DOMAIN": env("MAILGUN_DOMAIN", default=None),
-        "MAILGUN_API_URL": env("MAILGUN_API_URL", default="https://api.mailgun.net/v3"),
-    }
-else:
-    # Fallback to console backend to avoid startup failure when Mailgun is not configured
-    EMAIL_BACKEND = env(
-        "DJANGO_EMAIL_BACKEND",
-        default="django.core.mail.backends.console.EmailBackend",
-    )
+# Use console backend for development and production (no external email service)
+EMAIL_BACKEND = env(
+    "DJANGO_EMAIL_BACKEND",
+    default="django.core.mail.backends.console.EmailBackend",
+)
 
 
 # LOGGING
