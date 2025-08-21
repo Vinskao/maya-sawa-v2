@@ -77,6 +77,8 @@ pipeline {
                         set -e
                         pip install --no-cache-dir poetry
                         poetry config virtualenvs.create false
+                        # Generate lock file (will be created if missing)
+                        poetry lock
                         poetry install --no-root --only main
                     '''
                 }
