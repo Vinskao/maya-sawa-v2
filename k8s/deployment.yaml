@@ -67,10 +67,10 @@ spec:
             - containerPort: 8000
           resources:
             requests:
-              cpu: 25m
+              cpu: 20m
               memory: 128Mi
             limits:
-              cpu: 100m
+              cpu: 50m
               memory: 256Mi
           env:
             - name: DJANGO_SETTINGS_MODULE
@@ -127,6 +127,11 @@ spec:
                 secretKeyRef:
                   name: app-config
                   key: CELERY_RESULT_BACKEND
+            - name: CELERY_TASK_DEFAULT_QUEUE
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: CELERY_TASK_DEFAULT_QUEUE
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -156,13 +161,13 @@ spec:
         - name: worker
           image: papakao/maya-sawa-v2:latest
           imagePullPolicy: Always
-          command: ["bash", "-lc", "celery -A config worker -l info -Q maya_v2"]
+          command: ["bash", "-lc", "celery -A config worker -l info -Q maya_v2 --concurrency=1"]
           resources:
             requests:
-              cpu: 25m
+              cpu: 20m
               memory: 128Mi
             limits:
-              cpu: 100m
+              cpu: 20m
               memory: 256Mi
           env:
             - name: DJANGO_SETTINGS_MODULE
@@ -219,6 +224,11 @@ spec:
                 secretKeyRef:
                   name: app-config
                   key: CELERY_RESULT_BACKEND
+            - name: CELERY_TASK_DEFAULT_QUEUE
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: CELERY_TASK_DEFAULT_QUEUE
             - name: REDIS_QUEUE_MAYA_V2
               valueFrom:
                 secretKeyRef:

@@ -392,6 +392,13 @@ CELERY_TASK_ROUTES = {
     'maya_sawa_v2.ai_processing.tasks.*': {'queue': 'maya_v2'},
 }
 
+# Windows compatibility settings
+import sys
+if sys.platform.startswith('win'):
+    CELERY_WORKER_POOL = 'solo'
+    CELERY_WORKER_CONCURRENCY = 1
+    CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+
 # RabbitMQ specific settings
 if RABBITMQ_ENABLED:
     CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True

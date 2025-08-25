@@ -7,7 +7,7 @@ from maya_sawa_v2.ai_processing.services.ai_response_service import AIResponseSe
 logger = logging.getLogger(__name__)
 
 
-@shared_task(bind=True)
+@shared_task(bind=True, queue='maya_v2')
 def process_ai_response(self, task_id):
     """處理 AI 回應的非同步任務"""
     try:
@@ -16,7 +16,13 @@ def process_ai_response(self, task_id):
         processing_task.save(update_fields=['status'])
 
         service = AIResponseService()
-        response = service.process_task(processing_task)
+
+        # 如果有知識庫上下文，將其添加到額外上下文中
+        extra_context = {}
+        if processing_task.knowledge_context:
+            extra_context['knowledge_context'] = processing_task.knowledge_context
+
+        response = service.process_task(processing_task, extra_context=extra_context)
 
         # 構建完整的結果信息
         result = {
@@ -30,8 +36,8 @@ def process_ai_response(self, task_id):
             },
             'processing_time': processing_task.processing_time,
             'completed_at': processing_task.completed_at.isoformat() if processing_task.completed_at else None,
-            'knowledge_used': False,  # 暫時設為 False，後續可以從 metadata 中獲取
-            'knowledge_citations': [],
+            'knowledge_used': processing_task.knowledge_used,
+            'knowledge_citations': processing_task.knowledge_citations,
             'metadata': {
                 'task_id': str(task_id),
                 'status': 'completed'

@@ -103,7 +103,7 @@ graph TB
     class E1,E2,E3,E4 external
 ```
 
-## 對話流程圖 (LangGraph 工作流)
+## 對話流程圖 (LangGraph 工作流架構圖)
 
 ```mermaid
 sequenceDiagram
@@ -161,40 +161,6 @@ sequenceDiagram
     Note over F,R: 可用 GET /maya-sawa/qa/chat-history/{session_id}
 ```
 
-## 傳統流程圖 (對比)
-
-```mermaid
-sequenceDiagram
-    participant U as 用戶
-    participant F as 前端
-    participant A as API
-    participant R as Redis
-    participant DB as PostgreSQL
-    participant KM as 知識檢索
-    participant AI as AI Provider
-
-    U->>F: 發送問題
-    F->>A: POST /maya-v2/ask-with-model/
-    A->>DB: 建立 Conversation, Message
-    A->>R: 追加使用者訊息(chat:session)
-    A->>KM: Hybrid Search(trigram + pgvector)
-    KM->>DB: 檢索 articles.content/embedding
-    DB-->>A: Top-K 相關內容
-    
-    alt 找到相關內容
-        A->>AI: 調用指定模型 + 知識庫內容
-        AI-->>A: 回傳 AI 回應 + 引用資訊
-    else 未找到相關內容
-        A->>AI: 調用指定模型
-        AI-->>A: 回傳 AI 回應 + 無法找到知識庫說明
-    end
-    
-    A->>R: 追加 AI 訊息(chat:session)
-    A->>DB: 建立 AI Message
-    A-->>F: 回傳 AI 回應 + 知識庫狀態
-
-    Note over F,R: 可用 GET /maya-sawa/qa/chat-history/{session_id}
-```
 
 ## 全文檢索混和 Embedding 架構圖
 
@@ -252,7 +218,7 @@ graph TD
   classDef tbl fill:#f1f8e9,stroke:#43a047,stroke-width:1px
 ```
 
-## LangGraph 工作流架構圖
+
 
 ```mermaid
 graph TB
@@ -360,8 +326,24 @@ poetry run python manage.py setup_ai_models
 # 8. 創建超級用戶
 poetry run python manage.py createsuperuser
 
-# 9. 啟動服務（同時啟動 Django 和 Celery Worker）
-lsof -ti:8000 | xargs kill -9 2>/dev/null; poetry run python manage.py runserver & poetry run celery -A config worker -l info -Q maya_v2
+# 9. 啟動服務
+
+## 啟動 Producer (Django 服務器)
+```bash
+# 停止可能佔用 8000 端口的進程
+lsof -ti:8000 | xargs kill -9 2>/dev/null
+
+# 啟動 Django 服務器
+poetry run python manage.py runserver
+```
+
+## 啟動 Consumer (Celery Worker)
+```bash
+# 在新的終端窗口中啟動 Celery Worker
+poetry run celery -A config worker -l info -Q maya_v2
+```
+
+**注意：** 需要同時運行 Producer 和 Consumer 才能正常處理異步任務。
 
 ```
 
@@ -434,18 +416,6 @@ API_RATE_LIMIT_ENABLED=false
 ### 📋 完整 API 查詢過程記錄
 
 #### **方式一：同步處理（推薦用於簡單問題）**
-
-##### 1. 健康檢查
-```bash
-curl -X GET "http://127.0.0.1:8000/healthz"
-```
-**預期回應：**
-```json
-{
-  "status": "healthy",
-  "timestamp": "2025-08-25T10:30:00Z"
-}
-```
 
 ##### 2. 獲取可用模型列表
 ```bash
@@ -600,19 +570,6 @@ curl -X GET "http://127.0.0.1:8000/maya-v2/task-status/a7e35f8e-c09d-4a25-868b-d
 
 #### **方式三：特定功能測試**
 
-##### 1. 測試工具選擇功能（計算器）
-```bash
-curl -X POST "http://127.0.0.1:8000/maya-v2/ask-with-model/" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "question": "請幫我計算 123 + 456 等於多少？",
-    "model_name": "gpt-4o-mini",
-    "sync": true,
-    "use_knowledge_base": true
-  }'
-```
-
-##### 2. 測試編程問題（知識庫檢索）
 ```bash
 curl -X POST "http://127.0.0.1:8000/maya-v2/ask-with-model/" \
   -H "Content-Type: application/json" \
@@ -653,115 +610,6 @@ curl -X GET "http://127.0.0.1:8000/maya-sawa/qa/chat-history/test_session_123/"
 
 ---
 
-### 🔄 前端實現範例
-
-#### **JavaScript 異步處理完整流程**
-
-```javascript
-class MayaSawaAPI {
-  constructor(baseURL = 'http://127.0.0.1:8000') {
-    this.baseURL = baseURL;
-  }
-
-  // 提交問題（異步）
-  async submitQuestion(question, modelName = 'gpt-4o-mini', useKnowledgeBase = true) {
-    const response = await fetch(`${this.baseURL}/maya-v2/ask-with-model/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        question,
-        model_name: modelName,
-        sync: false,
-        use_knowledge_base: useKnowledgeBase
-      })
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    return await response.json();
-  }
-
-  // 查詢任務狀態
-  async getTaskStatus(taskId) {
-    const response = await fetch(`${this.baseURL}/maya-v2/task-status/${taskId}`);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    return await response.json();
-  }
-
-  // 輪詢任務結果
-  async pollTaskResult(taskId, interval = 2000, maxAttempts = 30) {
-    let attempts = 0;
-    
-    return new Promise((resolve, reject) => {
-      const poll = async () => {
-        try {
-          const status = await this.getTaskStatus(taskId);
-          
-          if (status.status === 'SUCCESS') {
-            resolve(status);
-          } else if (status.status === 'FAILURE') {
-            reject(new Error(status.error || 'Task failed'));
-          } else if (attempts >= maxAttempts) {
-            reject(new Error('Polling timeout'));
-          } else {
-            attempts++;
-            setTimeout(poll, interval);
-          }
-        } catch (error) {
-          reject(error);
-        }
-      };
-      
-      poll();
-    });
-  }
-
-  // 獲取可用模型
-  async getAvailableModels() {
-    const response = await fetch(`${this.baseURL}/maya-v2/available-models/`);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    return await response.json();
-  }
-}
-
-// 使用範例
-const api = new MayaSawaAPI();
-
-// 提交問題並輪詢結果
-async function askQuestion(question) {
-  try {
-    console.log('提交問題:', question);
-    
-    // 1. 提交問題
-    const submitResult = await api.submitQuestion(question);
-    console.log('任務已提交:', submitResult.task_id);
-    
-    // 2. 輪詢結果
-    const result = await api.pollTaskResult(submitResult.task_id);
-    console.log('AI 回答:', result.ai_response);
-    
-    return result;
-  } catch (error) {
-    console.error('錯誤:', error.message);
-  }
-}
-
-// 使用
-askQuestion("Java 中的多線程是什麼？");
-```
-
----
-
 ### 📊 API 狀態碼說明
 
 | 狀態碼 | 說明 | 處理方式 |
@@ -775,9 +623,16 @@ askQuestion("Java 中的多線程是什麼？");
 
 ### 🚀 快速測試命令
 
-#### 1. 健康檢查
+#### 1. 檢查服務狀態
 ```bash
+# 檢查 Django 服務
 curl -X GET "http://127.0.0.1:8000/healthz"
+
+# 檢查 Celery Worker 狀態
+poetry run celery -A config inspect active
+
+# 檢查 RabbitMQ 隊列狀態
+curl -u admin:admin123 http://localhost:15672/api/queues
 ```
 
 #### 2. 獲取可用模型列表
@@ -790,8 +645,8 @@ curl -X GET "http://127.0.0.1:8000/maya-v2/available-models/"
 curl -X POST "http://127.0.0.1:8000/maya-v2/ask-with-model/" \
   -H "Content-Type: application/json" \
   -d '{
-    "question": "你好，這是一個測試問題。請簡單介紹一下你自己。",
-    "model_name": "gpt-4o-mini",
+    "question": "請告訴我Java非同步方法有哪些。",
+    "model_name": "gpt-4.1-nano",
     "sync": true,
     "use_knowledge_base": true
   }'
@@ -799,38 +654,34 @@ curl -X POST "http://127.0.0.1:8000/maya-v2/ask-with-model/" \
 
 #### 4. 測試異步 API (Celery 任務)
 ```bash
+# 1. 提交異步任務
 curl -X POST "http://127.0.0.1:8000/maya-v2/ask-with-model/" \
   -H "Content-Type: application/json" \
   -d '{
-    "question": "這是一個異步測試問題。請告訴我今天的日期。",
-    "model_name": "gpt-4o-mini",
+    "question": "請告訴我Java非同步方法有哪些。",
+    "model_name": "gpt-4.1-nano",
     "sync": false,
     "use_knowledge_base": true
   }'
-```
 
-#### 5. 測試工具選擇功能
-```bash
-curl -X POST "http://127.0.0.1:8000/maya-v2/ask-with-model/" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "question": "請幫我計算 123 + 456 等於多少？",
-    "model_name": "gpt-4o-mini",
-    "sync": true,
-    "use_knowledge_base": true
-  }'
-```
+# 2. 獲取返回的 task_id，然後輪詢任務狀態
+curl -X GET "http://127.0.0.1:8000/maya-v2/task-status/{task_id}"
 
-#### 6. 測試編程問題 (知識庫檢索)
-```bash
-curl -X POST "http://127.0.0.1:8000/maya-v2/ask-with-model/" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "question": "Python 中的裝飾器是什麼？",
-    "model_name": "gpt-4o-mini",
-    "sync": true,
-    "use_knowledge_base": true
-  }'
+# 範例：查詢特定任務狀態
+curl -X GET "http://127.0.0.1:8000/maya-v2/task-status/58ba93ea-9b05-4b27-9683-114202d0509a"
+
+# 3. 故障排除命令
+# 檢查 Celery 任務狀態
+poetry run celery -A config inspect active
+
+# 檢查保留的任務
+poetry run celery -A config inspect reserved
+
+# 檢查 RabbitMQ 隊列狀態
+curl -u admin:admin123 http://localhost:15672/api/queues
+
+# PowerShell 版本
+Invoke-WebRequest -Uri "http://localhost:15672/api/queues" -Headers @{Authorization="Basic " + [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("admin:admin123"))} | Select-Object -ExpandProperty Content
 ```
 
 #### 7. 測試聊天歷史
@@ -884,7 +735,21 @@ curl -X GET "http://127.0.0.1:8000/maya-sawa/qa/chat-history/test_session_123/"
 }
 ```
 
-#### **異步 API 完成回應**
+#### **2. 查詢任務狀態（輪詢）**
+```bash
+curl -X GET "http://127.0.0.1:8000/maya-v2/task-status/a7e35f8e-c09d-4a25-868b-dd97173c00c6"
+```
+
+**任務執行中：**
+```json
+{
+  "task_id": "a7e35f8e-c09d-4a25-868b-dd97173c00c6",
+  "status": "STARTED",
+  "message": "Task is currently being processed"
+}
+```
+
+**任務完成：**
 ```json
 {
   "task_id": "a7e35f8e-c09d-4a25-868b-dd97173c00c6",
@@ -917,83 +782,6 @@ curl -X GET "http://127.0.0.1:8000/maya-sawa/qa/chat-history/test_session_123/"
 }
 ```
 
-#### **錯誤回應格式**
-```json
-{
-  "error": "錯誤訊息",
-  "details": "詳細錯誤信息（可選）"
-}
-```
-
-### 完整測試腳本
-
-#### 運行 bash 測試腳本
-```bash
-# 給腳本執行權限
-chmod +x test_curl_api.sh
-
-# 運行測試
-./test_curl_api.sh
-```
-
-#### 運行 Python 測試
-```bash
-python test_celery_langgraph.py
-```
-
-### 其他 API 端點
-
-#### 添加 AI 模型
-```bash
-curl -X POST "http://127.0.0.1:8000/maya-v2/add-model/"
-```
-
-#### 使用指定模型進行對話
-```bash
-# 使用 GPT-4o-mini 模型
-curl -X POST "http://127.0.0.1:8000/maya-v2/ask-with-model/" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "question": "什麼是Java",
-    "model_name": "gpt-4o-mini",
-    "sync": true,
-    "use_knowledge_base": true
-  }'
-
-# 使用 Gemini 1.5 Flash 模型
-curl -X POST "http://127.0.0.1:8000/maya-v2/ask-with-model/" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "question": "如何實現多線程",
-    "model_name": "gemini-1.5-flash",
-    "sync": true,
-    "use_knowledge_base": true
-  }'
-
-```
-
-### 服務啟動檢查
-
-#### 1. Django 服務器未運行
-```bash
-# 啟動 Django 服務器
-poetry run python manage.py runserver
-```
-
-#### 2. Celery Worker 未運行
-```bash
-# 啟動 Celery Worker
-poetry run celery -A config worker -l info -Q maya_v2
-```
-
-#### 3. RabbitMQ 未運行
-```bash
-# 啟動 RabbitMQ
-docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 \
-  -e RABBITMQ_DEFAULT_USER=admin -e RABBITMQ_DEFAULT_PASS=admin123 \
-  rabbitmq:3-management
-```
-
 #### 4. 檢查 RabbitMQ 管理界面
 ```bash
 # 訪問管理界面
@@ -1011,24 +799,60 @@ poetry run celery -A config inspect active
 poetry run celery -A config inspect stats
 ```
 
-### 監控和日誌
-
-#### 查看 Django 日誌
-```bash
-poetry run python manage.py runserver --verbosity=2
-```
-
-#### 查看 Celery Worker 日誌
-```bash
-poetry run celery -A config worker -l debug -Q maya_v2
-```
-
-#### 查看 RabbitMQ 日誌
-```bash
-docker logs rabbitmq
-```
-
 ## 部署
+
+### 🐳 Docker 部署
+
+#### 本地開發環境
+```bash
+# 啟動 RabbitMQ 和 Redis
+docker-compose up -d
+
+# 啟動 Django 服務
+poetry run python manage.py runserver
+
+# 啟動 Celery Worker（監聽 maya_v2 隊列）
+# Windows 環境（自動使用 solo 池模式）
+poetry run celery -A config worker -l info -Q maya_v2
+
+# Linux 環境（可選：指定並發數）
+poetry run celery -A config worker -l info -Q maya_v2 --concurrency=4
+```
+
+#### 生產環境 Docker
+```bash
+# 構建映像
+docker build -t maya-sawa-v2 .
+
+# 運行容器
+docker run -d \
+  --name maya-sawa-v2 \
+  -p 8000:8000 \
+  --env-file .env \
+  maya-sawa-v2
+```
+
+### ☸️ Kubernetes 部署
+
+#### Celery 架構說明
+- **隊列名稱**: `maya_v2`（統一使用此隊列）
+- **容器配置**: 
+  - 1 個 web 容器（Django 服務）
+  - 1 個 worker 容器（Celery 消費者）
+- **資源限制**: 
+  - 總 CPU 限制：40m（web: 20m + worker: 20m）
+  - 每個容器記憶體：256Mi
+- **Worker 配置**: 
+  - 開發環境：使用 `solo` 池模式（Windows 兼容）
+  - 生產環境：使用預設池模式，單進程（`--concurrency=1`）
+- **知識庫支持**: 異步任務支持知識庫上下文和引用
+
+#### 部署命令
+```bash
+# 使用 Jenkins 自動部署
+# 或手動部署
+kubectl apply -f k8s/deployment.yaml
+```
 
 ### Docker 部署
 ```bash
@@ -1084,11 +908,6 @@ poetry run python manage.py toggle_api_security
 
 # 回填文章嵌入向量
 poetry run python manage.py backfill_article_embeddings
-
-# 查看可用模型
-poetry run python manage.py shell
->>> from maya_sawa_v2.ai_processing.models import AIModel
->>> AIModel.objects.filter(is_active=True).values('name', 'provider', 'model_id')
 ```
 
 ## 授權

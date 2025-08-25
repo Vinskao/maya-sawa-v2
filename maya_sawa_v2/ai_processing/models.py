@@ -36,6 +36,9 @@ class ProcessingTask(models.Model):
     result = models.TextField(blank=True)
     error_message = models.TextField(blank=True)
     processing_time = models.FloatField(null=True, blank=True)  # 秒
+    knowledge_context = models.TextField(blank=True)  # 知識庫上下文
+    knowledge_citations = models.JSONField(default=list)  # 知識庫引用
+    knowledge_used = models.BooleanField(default=False)  # 是否使用了知識庫
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 

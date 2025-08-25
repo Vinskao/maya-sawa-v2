@@ -386,7 +386,10 @@ def ask_with_model(request):
                     conversation=conversation,
                     message=user_message,
                     ai_model=ai_model,
-                    status='queued'
+                    status='queued',
+                    knowledge_context=knowledge_context,
+                    knowledge_citations=knowledge_citations,
+                    knowledge_used=knowledge_found
                 )
 
                 # 發送 Celery 任務

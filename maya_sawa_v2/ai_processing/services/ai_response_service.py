@@ -79,6 +79,10 @@ class AIResponseService:
         provider = get_ai_provider(task.ai_model.provider, task.ai_model.config)
         response = provider.generate_response(task.message.content, context)
 
+        # 如果有知識庫上下文，將其添加到回應中
+        if extra_context and extra_context.get('knowledge_context'):
+            response = f"{response}\n\n{extra_context['knowledge_context']}"
+
         processing_time = time.time() - start_time
 
         Message.objects.create(
