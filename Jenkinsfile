@@ -168,7 +168,11 @@ pipeline {
                                 kubectl create secret generic app-config \
                                   --from-literal=DATABASE_URL="$DATABASE_URL" \
                                   --from-literal=REDIS_URL="$REDIS_URL" \
-                                  --from-literal=CELERY_BROKER_URL="$CELERY_BROKER_URL" \
+                                  --from-literal=RABBITMQ_HOST="rabbitmq-service" \
+                                  --from-literal=RABBITMQ_PORT="5672" \
+                                  --from-literal=RABBITMQ_USERNAME="admin" \
+                                  --from-literal=RABBITMQ_PASSWORD="admin123" \
+                                  --from-literal=CELERY_BROKER_URL="amqp://admin:admin123@rabbitmq-service:5672/" \
                                   --from-literal=CELERY_RESULT_BACKEND="$CELERY_RESULT_BACKEND" \
                                   --from-literal=REDIS_QUEUE_MAYA_V2="$REDIS_QUEUE_MAYA_V2" \
                                   --from-literal=DJANGO_ADMIN_URL="$DJANGO_ADMIN_URL" \

@@ -365,7 +365,23 @@ REST_FRAMEWORK = {
 
 # Celery Configuration
 # ------------------------------------------------------------------------------
-CELERY_BROKER_URL = env('CELERY_BROKER_URL', default=REDIS_URL)
+# RabbitMQ as broker, Redis as result backend
+RABBITMQ_ENABLED = env.bool('RABBITMQ_ENABLED', default=False)
+
+if RABBITMQ_ENABLED:
+    # Use RabbitMQ as broker
+    RABBITMQ_HOST = env('RABBITMQ_HOST', default='localhost')
+    RABBITMQ_PORT = env.int('RABBITMQ_PORT', default=5672)
+    RABBITMQ_USERNAME = env('RABBITMQ_USERNAME', default='admin')
+    RABBITMQ_PASSWORD = env('RABBITMQ_PASSWORD', default='admin123')
+    RABBITMQ_VIRTUAL_HOST = env('RABBITMQ_VIRTUAL_HOST', default='/')
+
+    CELERY_BROKER_URL = f'amqp://{RABBITMQ_USERNAME}:{RABBITMQ_PASSWORD}@{RABBITMQ_HOST}:{RABBITMQ_PORT}/{RABBITMQ_VIRTUAL_HOST}'
+else:
+    # Fallback to Redis as broker
+    CELERY_BROKER_URL = env('CELERY_BROKER_URL', default=REDIS_URL)
+
+# Always use Redis as result backend for better performance
 CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND', default=REDIS_URL)
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
@@ -375,6 +391,14 @@ CELERY_TASK_DEFAULT_QUEUE = 'maya_v2'
 CELERY_TASK_ROUTES = {
     'maya_sawa_v2.ai_processing.tasks.*': {'queue': 'maya_v2'},
 }
+
+# RabbitMQ specific settings
+if RABBITMQ_ENABLED:
+    CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+    CELERY_BROKER_CONNECTION_MAX_RETRIES = 10
+    CELERY_BROKER_CONNECTION_RETRY = True
+    CELERY_BROKER_POOL_LIMIT = 10
+    CELERY_BROKER_HEARTBEAT = 10
 
 # drf-spectacular Configuration
 # ------------------------------------------------------------------------------

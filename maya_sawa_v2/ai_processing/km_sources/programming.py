@@ -68,23 +68,32 @@ class ProgrammingKMSource(BaseKMSource):
         if (self._articles_cache is None or
             current_time - self._cache_timestamp > self.cache_timeout):
 
+            logger.info("開始從 Paprika API 獲取文章...")
             try:
                 # 優先使用當前執行緒的 running loop 檢測
                 try:
                     _ = asyncio.get_running_loop()
                     # 有 running loop：改用執行緒中執行 asyncio.run，避免 RuntimeError
                     import concurrent.futures
+                    logger.info("使用 ThreadPoolExecutor 執行異步請求...")
                     with concurrent.futures.ThreadPoolExecutor() as executor:
                         future = executor.submit(lambda: asyncio.run(self._fetch_articles_from_paprika()))
-                        self._articles_cache = future.result()
+                        # 添加超時處理
+                        self._articles_cache = future.result(timeout=10)  # 10秒超時
                 except RuntimeError:
                     # 無 running loop：可直接 asyncio.run
+                    logger.info("直接使用 asyncio.run...")
                     self._articles_cache = asyncio.run(self._fetch_articles_from_paprika())
+                except concurrent.futures.TimeoutError:
+                    logger.warning("Paprika API 請求超時，使用空快取")
+                    self._articles_cache = []
 
                 self._cache_timestamp = current_time
+                logger.info(f"成功獲取 {len(self._articles_cache)} 篇文章")
 
             except Exception as e:
                 # 最後回退：手動建立事件迴圈
+                logger.warning(f"主要獲取方式失敗，嘗試回退方式: {str(e)}")
                 try:
                     loop = asyncio.new_event_loop()
                     try:

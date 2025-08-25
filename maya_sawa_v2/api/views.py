@@ -280,6 +280,7 @@ def ask_with_model(request):
                 # 如果使用知識庫，先搜索相關知識
         knowledge_context = ""
         knowledge_citations = []
+        knowledge_found = False
         if use_knowledge_base:
             try:
                 from maya_sawa_v2.ai_processing.km_sources.manager import KMSourceManager
@@ -375,17 +376,40 @@ def ask_with_model(request):
                     'error': f'AI 處理失敗: {str(e)}'
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         else:
-            # 目前暫不支援異步處理，避免未建立 ProcessingTask 導致錯誤
-            return Response({
-                'error': '目前僅支援同步處理，請將 sync 設為 true',
-                'conversation_id': str(conversation.id),
-                'question': question,
-                'ai_model': {
-                    'id': ai_model.id,
-                    'name': ai_model.name,
-                    'provider': ai_model.provider
-                }
-            }, status=status.HTTP_400_BAD_REQUEST)
+            # 異步處理 - 使用 Celery 任務
+            try:
+                from maya_sawa_v2.ai_processing.tasks import process_ai_response
+                from maya_sawa_v2.ai_processing.models import ProcessingTask
+
+                # 創建處理任務
+                processing_task = ProcessingTask.objects.create(
+                    conversation=conversation,
+                    message=user_message,
+                    ai_model=ai_model,
+                    status='queued'
+                )
+
+                # 發送 Celery 任務
+                celery_task = process_ai_response.delay(processing_task.id)
+
+                return Response({
+                    'task_id': str(celery_task.id),
+                    'status': 'queued',
+                    'message': 'Task has been queued for processing',
+                    'conversation_id': str(conversation.id),
+                    'question': question,
+                    'ai_model': {
+                        'id': ai_model.id,
+                        'name': ai_model.name,
+                        'provider': ai_model.provider
+                    }
+                })
+
+            except Exception as e:
+                logger.error(f"異步處理失敗: {str(e)}")
+                return Response({
+                    'error': f'異步處理失敗: {str(e)}'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     except Exception as e:
         logger.error(f"API 錯誤: {str(e)}")
@@ -408,6 +432,64 @@ def chat_history(request, session_id: str):
         return Response(data)
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def task_status(request, task_id: str):
+    """查詢 Celery 任務狀態和結果"""
+    try:
+        from maya_sawa_v2.ai_processing.tasks import process_ai_response
+
+        # 獲取 Celery 任務狀態
+        celery_task = process_ai_response.AsyncResult(task_id)
+
+        # 構建基本回應
+        response_data = {
+            'task_id': task_id,
+            'status': celery_task.status,
+        }
+
+        # 根據任務狀態添加額外信息
+        if celery_task.status == 'SUCCESS':
+            # 任務完成，獲取結果
+            result = celery_task.result
+            if isinstance(result, dict):
+                response_data.update({
+                    'ai_response': result.get('response', ''),
+                    'knowledge_used': result.get('knowledge_used', False),
+                    'knowledge_citations': result.get('knowledge_citations', []),
+                    'metadata': result.get('metadata', {}),
+                    'completed_at': result.get('completed_at'),
+                    'conversation_id': result.get('conversation_id'),
+                    'question': result.get('question'),
+                    'ai_model': result.get('ai_model')
+                })
+            else:
+                response_data['ai_response'] = str(result)
+
+        elif celery_task.status == 'FAILURE':
+            # 任務失敗
+            response_data.update({
+                'error': str(celery_task.result),
+                'traceback': celery_task.traceback
+            })
+
+        elif celery_task.status == 'PENDING':
+            # 任務等待中
+            response_data['message'] = 'Task is waiting for execution'
+
+        elif celery_task.status == 'STARTED':
+            # 任務執行中
+            response_data['message'] = 'Task is currently being processed'
+
+        return Response(response_data)
+
+    except Exception as e:
+        logger.error(f"查詢任務狀態失敗: {str(e)}")
+        return Response({
+            'error': f'查詢任務狀態失敗: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET', 'OPTIONS'])

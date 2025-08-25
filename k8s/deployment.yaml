@@ -95,6 +95,28 @@ spec:
                 secretKeyRef:
                   name: app-config
                   key: REDIS_URL
+            - name: RABBITMQ_ENABLED
+              value: "true"
+            - name: RABBITMQ_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: RABBITMQ_HOST
+            - name: RABBITMQ_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: RABBITMQ_PORT
+            - name: RABBITMQ_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: RABBITMQ_USERNAME
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: RABBITMQ_PASSWORD
             - name: CELERY_BROKER_URL
               valueFrom:
                 secretKeyRef:
@@ -165,6 +187,28 @@ spec:
                 secretKeyRef:
                   name: app-config
                   key: REDIS_URL
+            - name: RABBITMQ_ENABLED
+              value: "true"
+            - name: RABBITMQ_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: RABBITMQ_HOST
+            - name: RABBITMQ_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: RABBITMQ_PORT
+            - name: RABBITMQ_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: RABBITMQ_USERNAME
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: RABBITMQ_PASSWORD
             - name: CELERY_BROKER_URL
               valueFrom:
                 secretKeyRef:

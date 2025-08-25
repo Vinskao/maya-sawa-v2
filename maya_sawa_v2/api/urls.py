@@ -8,6 +8,7 @@ from .views import (
     add_model,
     chat_history,
     legacy_chat_history,
+    task_status,
 )
 
 conversation_router = DefaultRouter()
@@ -26,4 +27,6 @@ urlpatterns = [
     path('maya-sawa/qa/chat-history/<str:session_tail>', legacy_chat_history, name='chat_history'),
     # Backward compatibility: v2 style
     path('maya-v2/qa/chat-history/<str:session_id>', chat_history, name='chat_history_v2'),
+    # Task status endpoint
+    path('maya-v2/task-status/<str:task_id>', task_status, name='task_status'),
 ]
