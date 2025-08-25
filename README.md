@@ -814,9 +814,7 @@ poetry run python manage.py runserver
 # 啟動 Celery Worker（監聽 maya_v2 隊列）
 # Windows 環境（自動使用 solo 池模式）
 poetry run celery -A config worker -l info -Q maya_v2
-
-# Linux 環境（可選：指定並發數）
-poetry run celery -A config worker -l info -Q maya_v2 --concurrency=4
+poetry run celery -A config worker -l info -Q maya_v2 --concurrency=1
 ```
 
 #### 生產環境 Docker
@@ -833,6 +831,11 @@ docker run -d \
 ```
 
 ### ☸️ Kubernetes 部署
+
+#### 依賴說明
+- **LangChain/LangGraph**: 暫時移除以避免依賴衝突，當前 AI 處理邏輯不依賴於此
+- **OpenAI**: 升級到 1.40.0 以確保兼容性
+- **其他依賴**: 保持穩定版本
 
 #### Celery 架構說明
 - **隊列名稱**: `maya_v2`（統一使用此隊列）
